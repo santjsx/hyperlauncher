@@ -1,0 +1,2223 @@
+# HYPRLAUNCHER
+
+## Industry-Grade Product Requirements Document
+
+**Document Version:** 1.0
+**Status:** Product Specification
+**Platform:** Android
+**Application Type:** Third-Party Android Launcher
+**Primary Development Environment:** Antigravity
+**Primary Language:** Kotlin
+**UI Framework:** Jetpack Compose
+**Minimum Android Version:** Android 10+
+**Target SDK:** Latest stable Android SDK available during implementation
+**Architecture:** Modular, reactive, unidirectional data flow
+**Product Philosophy:** Linux power-user workflow + Android-native reliability + extreme performance
+
+---
+
+# 1. PRODUCT OVERVIEW
+
+## 1.1 Product Name
+
+**HyprLauncher**
+
+HyprLauncher is a premium, highly customizable Android launcher inspired by:
+
+* Arch Linux
+* Hyprland
+* Waybar
+* Rofi/Wofi
+* Linux ricing culture
+* Terminal-centric workflows
+* Minimalist power-user interfaces
+
+The product must NOT attempt to imitate a Linux desktop literally.
+
+Instead, it should translate the design principles and interaction philosophy of Linux desktop environments into a polished, native Android launcher.
+
+The final product should feel:
+
+* Fast
+* Minimal
+* Technical
+* Premium
+* Highly configurable
+* Extremely responsive
+* Stable
+* Deliberately designed
+* Native to Android
+
+The application must never feel like a generic Android launcher with a superficial Linux skin.
+
+---
+
+# 2. PRODUCT VISION
+
+Build an Android launcher where:
+
+> Every interaction is intentional, every visual element is configurable, and every performance cost is justified.
+
+The launcher should provide the customization depth expected by Linux ricing enthusiasts while maintaining the simplicity and reliability expected from a production Android application.
+
+The product should prioritize:
+
+1. Performance
+2. Stability
+3. Usability
+4. Customization
+5. Visual quality
+6. Power-user functionality
+
+Visual complexity must never compromise responsiveness.
+
+---
+
+# 3. CORE PRODUCT PRINCIPLES
+
+## 3.1 Performance First
+
+The launcher must prioritize:
+
+* Fast startup
+* Fast app launching
+* Fast search
+* Smooth scrolling
+* Low frame-time variance
+* Minimal unnecessary recomposition
+* Controlled memory usage
+* Minimal background processing
+
+## 3.2 Native Android
+
+Use Android APIs correctly.
+
+Do not fake:
+
+* System information
+* Launcher functionality
+* Widgets
+* Notifications
+* Permissions
+* System controls
+
+## 3.3 Progressive Complexity
+
+The default experience must remain simple.
+
+Advanced features should be discoverable without overwhelming new users.
+
+## 3.4 Graceful Degradation
+
+Optional failures must never crash the launcher.
+
+Examples:
+
+* Broken widget
+* Invalid theme
+* Missing icon
+* Unsupported API
+* Permission denied
+* Unavailable system information
+
+## 3.5 Offline First
+
+Core functionality must work without an internet connection.
+
+The launcher must not depend on cloud services for:
+
+* Home screen
+* App drawer
+* App search
+* Themes
+* Workspaces
+* Gestures
+* Basic customization
+
+---
+
+# 4. TARGET USERS
+
+## 4.1 Linux Ricing Enthusiast
+
+Needs:
+
+* Hyprland-inspired visuals
+* Monospace typography
+* Custom layouts
+* Custom colors
+* Status bars
+* Workspaces
+* Minimal UI
+
+## 4.2 Android Power User
+
+Needs:
+
+* Fast search
+* Gestures
+* App shortcuts
+* Custom workflows
+* Advanced launcher controls
+
+## 4.3 Minimalist User
+
+Needs:
+
+* Clean home screen
+* Large clock
+* Search
+* Minimal dock
+* Minimal visual noise
+
+## 4.4 Customization Enthusiast
+
+Needs:
+
+* Themes
+* Layout editor
+* Icon customization
+* Typography
+* Wallpapers
+* Animations
+* Export/import
+* Rice presets
+
+---
+
+# 5. NON-GOALS
+
+The following are explicitly outside the scope of the initial product:
+
+* Android ROM
+* Custom operating system
+* Linux distribution
+* Full desktop environment
+* Android window manager replacement
+* Root-only functionality
+* Arbitrary shell execution
+* Background Linux daemon
+* Fake terminal emulator
+* Cloud-dependent launcher
+* Social network
+* Advertising platform
+* Theme marketplace in v1
+* AI assistant as a core launcher dependency
+
+---
+
+# 6. VISUAL DESIGN DIRECTION
+
+## 6.1 Design Language
+
+The visual system should be inspired by modern Linux rices.
+
+Primary characteristics:
+
+* Deep black
+* Graphite
+* Dark navy
+* Slate surfaces
+* Subtle transparency
+* Thin borders
+* Controlled blur
+* Monospace accents
+* Minimal shadows
+* High contrast
+* Restrained accent colors
+* Dense but organized information
+
+## 6.2 Default Color System
+
+Default palette:
+
+```text
+Background:
+#08090C
+
+Surface:
+#111318
+
+Surface Elevated:
+#171A21
+
+Border:
+#272C36
+
+Primary Text:
+#F1F5F9
+
+Secondary Text:
+#94A3B8
+
+Accent:
+#00D9FF
+
+Accent Secondary:
+#7C3AED
+
+Success:
+#22C55E
+
+Warning:
+#F59E0B
+
+Error:
+#EF4444
+```
+
+All colors must be themeable.
+
+## 6.3 Explicitly Avoid
+
+Do NOT use:
+
+* Excessive gradients
+* Rainbow colors
+* Excessive glassmorphism
+* Giant rounded cards
+* Excessive shadows
+* Excessive neon
+* Decorative UI with no purpose
+* Excessive animations
+* Generic AI-generated dashboard aesthetics
+* Generic stock Android launcher layouts
+
+---
+
+# 7. INFORMATION ARCHITECTURE
+
+Primary application areas:
+
+```text
+HyprLauncher
+│
+├── Home
+├── App Drawer
+├── Search / Command Palette
+├── Workspaces
+├── Widgets
+├── Customization
+│   ├── Themes
+│   ├── Layout
+│   ├── Typography
+│   ├── Icons
+│   ├── Wallpaper
+│   ├── Animations
+│   └── Rice Studio
+│
+├── Gestures
+├── Settings
+├── Backup / Restore
+└── Diagnostics
+```
+
+---
+
+# 8. HOME SCREEN
+
+The home screen is the primary user environment.
+
+## Required Components
+
+* Clock
+* Date
+* App grid
+* Dock
+* Search
+* Wallpaper
+* Optional widgets
+* Optional status modules
+
+Every component must be independently configurable.
+
+---
+
+# 9. CLOCK
+
+The clock must support:
+
+* 12-hour format
+* 24-hour format
+* Seconds toggle
+* Custom font
+* Font size
+* Font weight
+* Letter spacing
+* Color
+* Alignment
+* Position
+* Date visibility
+* Date format
+
+Example:
+
+```text
+02:41
+
+FRI · 03 OCT
+```
+
+---
+
+# 10. APP GRID
+
+Users must be able to configure:
+
+* Number of columns
+* Number of rows
+* Icon size
+* Horizontal spacing
+* Vertical spacing
+* Label visibility
+* Label font
+* Label size
+* Label color
+* Alignment
+* Page behavior
+
+The app grid must support responsive layouts.
+
+Never hard-code dimensions based on a specific device.
+
+---
+
+# 11. DOCK
+
+The dock must support:
+
+* 0–N applications
+* Custom icon size
+* Labels on/off
+* Custom spacing
+* Position
+* Transparency
+* Border
+* Background
+* Corner radius
+
+The dock must remain optional.
+
+---
+
+# 12. APP DRAWER
+
+The app drawer is a core feature.
+
+## Opening Methods
+
+Default:
+
+```text
+Swipe Up → App Drawer
+```
+
+Optional:
+
+* Dock button
+* Gesture
+* Keyboard shortcut
+* Search action
+
+## App Drawer Features
+
+* Alphabetical sorting
+* Usage-based sorting
+* Recent applications
+* Categories
+* Favorites
+* Hidden applications
+* App shortcuts
+* Search
+* Custom sorting
+* Custom layout
+
+---
+
+# 13. APPLICATION INDEXING
+
+The launcher must maintain a local application index.
+
+Store appropriate metadata such as:
+
+```text
+packageName
+applicationName
+launchActivity
+category
+installTimestamp
+updateTimestamp
+enabledState
+lastUsed
+launchCount
+iconReference
+```
+
+The index must update when:
+
+* Application installed
+* Application removed
+* Application updated
+* Application enabled
+* Application disabled
+* Launcher starts
+
+Never perform a full application scan on every search.
+
+---
+
+# 14. APPLICATION SEARCH
+
+Search must feel instantaneous.
+
+Search pipeline:
+
+```text
+Input
+ ↓
+Normalize
+ ↓
+Exact Match
+ ↓
+Prefix Match
+ ↓
+Alias Match
+ ↓
+Fuzzy Match
+ ↓
+Usage Ranking
+ ↓
+Results
+```
+
+Search must support:
+
+* Application names
+* Package names
+* Aliases
+* Recent applications
+* Frequently used applications
+* App shortcuts
+* Categories
+
+Example:
+
+```text
+yt
+```
+
+may return:
+
+```text
+YouTube
+YouTube Music
+YouTube shortcuts
+```
+
+---
+
+# 15. SEARCH RANKING
+
+Default ranking priority:
+
+```text
+Exact match
+↓
+Prefix match
+↓
+Alias match
+↓
+Fuzzy similarity
+↓
+Usage frequency
+↓
+Recency
+```
+
+Ranking must be deterministic.
+
+Search must not require an internet connection.
+
+---
+
+# 16. ICON SYSTEM
+
+Support:
+
+* Android adaptive icons
+* Monochrome icons where available
+* Icon packs where technically supported
+* Custom icons
+* Per-app icon overrides
+* Vector icons
+* Automatic masking
+* Fallback icons
+
+## Icon Cache
+
+Use a two-level strategy:
+
+```text
+Memory Cache
+ ↓
+Disk Cache
+ ↓
+Android Package Manager
+```
+
+Icons must not be repeatedly decoded unnecessarily.
+
+Cache invalidation must occur when an application package changes.
+
+---
+
+# 17. WORKSPACE SYSTEM
+
+HyprLauncher must provide launcher-level workspaces inspired by Hyprland.
+
+Default workspaces:
+
+```text
+1 — Main
+2 — Work
+3 — Dev
+4 — Media
+5 — Games
+```
+
+Users can:
+
+* Create
+* Delete
+* Rename
+* Reorder
+* Assign wallpaper
+* Assign layout
+* Assign applications
+* Assign widgets
+* Assign gestures
+
+Workspace state must persist across launcher restarts.
+
+---
+
+# 18. WORKSPACE SWITCHING
+
+Default gestures:
+
+```text
+Swipe Left  → Previous Workspace
+Swipe Right → Next Workspace
+```
+
+Optional:
+
+```text
+Two-Finger Swipe
+```
+
+Workspace switching must preserve existing UI state.
+
+Do not unnecessarily recreate the entire home hierarchy.
+
+---
+
+# 19. GESTURE ENGINE
+
+Implement a centralized gesture system.
+
+Supported gestures:
+
+```text
+Swipe Up
+Swipe Down
+Swipe Left
+Swipe Right
+Double Tap
+Long Press
+Two-Finger Swipe
+```
+
+Each gesture can map to a structured launcher action.
+
+Possible actions:
+
+```text
+Open App Drawer
+Open Search
+Switch Workspace
+Open Settings
+Open Command Palette
+Launch Application
+Open Notification Shade where supported
+Open System UI where supported
+Lock Device where permitted
+```
+
+Android platform restrictions must always be respected.
+
+---
+
+# 20. COMMAND PALETTE
+
+The command palette is inspired by Rofi/Wofi.
+
+Activation:
+
+* Gesture
+* Search
+* Optional hardware keyboard shortcut
+
+Example:
+
+```text
+╭──────────────────────────────╮
+│ > Search or command          │
+├──────────────────────────────┤
+│ Firefox                      │
+│ Spotify                      │
+│ Workspace: Dev               │
+│ Settings                     │
+╰──────────────────────────────╯
+```
+
+Commands must map to safe internal launcher actions.
+
+Never execute arbitrary shell commands.
+
+---
+
+# 21. THEME ENGINE
+
+Themes must be data-driven.
+
+Theme properties:
+
+```text
+Colors
+Typography
+Shapes
+Borders
+Opacity
+Blur
+Icons
+Animations
+Layout defaults
+```
+
+Built-in themes:
+
+```text
+Arch Dark
+Hyprland
+Tokyo Night
+Catppuccin
+Nord
+Gruvbox
+Dracula
+AMOLED
+Graphite
+Custom
+```
+
+All theme values must be editable.
+
+---
+
+# 22. RICE SYSTEM
+
+A Rice represents a complete launcher configuration.
+
+A Rice may contain:
+
+```text
+Theme
+Wallpaper
+Layout
+Icons
+Typography
+Gestures
+Widgets
+Workspace configuration
+Animation settings
+Search configuration
+Dock configuration
+```
+
+Users must be able to:
+
+* Create
+* Save
+* Rename
+* Duplicate
+* Delete
+* Export
+* Import
+* Reset
+
+---
+
+# 23. RICE STUDIO
+
+Rice Studio is the primary advanced customization interface.
+
+Sections:
+
+```text
+Canvas
+Layout
+Colors
+Typography
+Icons
+Widgets
+Dock
+Search
+Gestures
+Animation
+Wallpaper
+Workspaces
+```
+
+The preview must update live.
+
+Use temporary draft state.
+
+Architecture:
+
+```text
+User Change
+ ↓
+Draft State
+ ↓
+Live Preview
+ ↓
+Apply
+ ↓
+Persist
+```
+
+Do not write every slider movement directly to permanent storage.
+
+---
+
+# 24. LAYOUT ENGINE
+
+Do not hard-code screen layouts.
+
+Use a declarative layout model.
+
+Conceptual structure:
+
+```text
+HomeLayout
+ ├── components
+ │    ├── Clock
+ │    ├── Search
+ │    ├── AppGrid
+ │    ├── Dock
+ │    ├── Widget
+ │    └── StatusBar
+ │
+ ├── spacing
+ ├── alignment
+ ├── typography
+ └── behavior
+```
+
+Each component should support appropriate properties such as:
+
+* Position
+* Size
+* Visibility
+* Opacity
+* Padding
+* Alignment
+* Style
+* Interaction
+* Animation
+
+---
+
+# 25. WIDGET SYSTEM
+
+Use Android's official widget-hosting APIs.
+
+Support:
+
+* Widget picker
+* Widget placement
+* Widget resizing
+* Widget movement
+* Widget removal
+* Widget persistence
+* Widget restoration
+
+Widgets must be treated as external/untrusted UI.
+
+A widget failure must never crash the entire launcher.
+
+Fallback:
+
+```text
+Widget Failure
+ ↓
+Fallback Placeholder
+ ↓
+Launcher Continues
+```
+
+---
+
+# 26. STATUS BAR / WAYBAR-INSPIRED MODULES
+
+Optional status modules:
+
+```text
+Battery
+Wi-Fi
+Mobile Network
+Bluetooth
+Volume
+Media
+Clock
+Date
+Weather
+Calendar
+VPN
+Notifications
+Storage
+Memory
+CPU
+```
+
+Only display information when reliable Android APIs are available.
+
+Never fake system information.
+
+Each module must be independently enabled/disabled.
+
+---
+
+# 27. WALLPAPER SYSTEM
+
+Support:
+
+* Static wallpapers
+* AMOLED wallpapers
+* Per-workspace wallpapers
+* Wallpaper dimming
+* Wallpaper blur
+* Scaling
+* Alignment
+* Cropping
+
+Large images must not be processed on the main thread.
+
+---
+
+# 28. TYPOGRAPHY
+
+Support:
+
+* Android system fonts
+* Bundled fonts
+* Monospace fonts
+* Custom font sizes
+* Font weights
+* Letter spacing
+* Line height
+
+Default typography:
+
+```text
+Primary UI:
+Modern Sans
+
+Technical UI:
+Monospace
+```
+
+---
+
+# 29. ANIMATION SYSTEM
+
+Animations must be purposeful.
+
+Do NOT animate every element.
+
+Suggested timing:
+
+```text
+Micro interaction:
+80–140ms
+
+Drawer:
+120–180ms
+
+Workspace transition:
+120–220ms
+
+Settings transition:
+150–250ms
+```
+
+Animation behavior must be configurable.
+
+Provide:
+
+```text
+Full
+Reduced
+Minimal
+Disabled
+```
+
+Respect Android reduced-motion/accessibility requirements where applicable.
+
+---
+
+# 30. PERFORMANCE REQUIREMENTS
+
+Performance is a core product requirement.
+
+## Startup
+
+Render useful home content as early as possible.
+
+Avoid:
+
+```text
+Launch
+ ↓
+Scan apps
+ ↓
+Load icons
+ ↓
+Initialize widgets
+ ↓
+Load database
+ ↓
+Calculate themes
+ ↓
+Render
+```
+
+Preferred:
+
+```text
+Launch
+ ↓
+Restore cached state
+ ↓
+Render home
+ ↓
+Initialize optional systems asynchronously
+ ↓
+Update incrementally
+```
+
+---
+
+# 31. SEARCH PERFORMANCE
+
+Target:
+
+```text
+Typical local search response:
+<50ms
+```
+
+This must be validated through benchmarking.
+
+Search must not block the UI thread.
+
+---
+
+# 32. FRAME PERFORMANCE
+
+Target:
+
+```text
+60 FPS baseline
+90/120 FPS on capable devices
+```
+
+Measure:
+
+* Frame time
+* Jank
+* Slow frames
+* Rendering cost
+
+Do not use average FPS as the only performance metric.
+
+---
+
+# 33. MEMORY REQUIREMENTS
+
+Implement controlled caching.
+
+Memory-heavy resources include:
+
+* Icons
+* Wallpapers
+* Widget resources
+* Preview images
+
+All caches must have limits.
+
+The launcher must avoid unbounded memory growth.
+
+---
+
+# 34. BACKGROUND PROCESSING
+
+Avoid permanent background loops.
+
+Prefer:
+
+* Event-driven updates
+* Coroutines
+* Android lifecycle callbacks
+* Package change broadcasts where appropriate
+* Scheduled work only when genuinely required
+
+The launcher must not consume unnecessary battery while idle.
+
+---
+
+# 35. PROCESS DEATH
+
+Assume Android can terminate the launcher process.
+
+After process death:
+
+```text
+Load persisted configuration
+ ↓
+Restore active workspace
+ ↓
+Restore layout
+ ↓
+Restore apps/widgets
+ ↓
+Render
+```
+
+Persistent state must never depend solely on in-memory objects.
+
+---
+
+# 36. CONFIGURATION CHANGES
+
+Support:
+
+* Display density changes
+* Font scaling
+* Theme changes
+* Configuration changes
+* Resolution changes
+* Device rotation where applicable
+
+Do not rely on fixed screen dimensions.
+
+---
+
+# 37. ACCESSIBILITY
+
+Mandatory support:
+
+* TalkBack
+* Font scaling
+* Display scaling
+* High contrast
+* Reduced motion
+* Touch accessibility
+* Semantic labels
+* Keyboard navigation
+
+The application must remain usable at large system font sizes.
+
+---
+
+# 38. SETTINGS STRUCTURE
+
+```text
+Settings
+
+Appearance
+ ├── Theme
+ ├── Colors
+ ├── Typography
+ ├── Icons
+ └── Wallpaper
+
+Home
+ ├── Layout
+ ├── Grid
+ ├── Dock
+ ├── Widgets
+ └── Workspaces
+
+Search
+ ├── Search behavior
+ ├── Ranking
+ ├── History
+ └── Shortcuts
+
+Gestures
+ ├── Swipe
+ ├── Tap
+ ├── Long Press
+ └── Custom Actions
+
+Animations
+ ├── Speed
+ ├── Style
+ └── Reduced Motion
+
+Performance
+ ├── Performance Mode
+ ├── Blur
+ ├── Cache
+ └── Diagnostics
+
+Backup
+ ├── Export
+ ├── Import
+ └── Reset
+
+About
+ ├── Version
+ ├── Open Source
+ ├── Licenses
+ └── Diagnostics
+```
+
+---
+
+# 39. PERFORMANCE MODES
+
+## Balanced
+
+Default behavior.
+
+## Performance
+
+Reduce:
+
+* Blur
+* Expensive animations
+* Unnecessary background work
+
+## Maximum Performance
+
+Disable or minimize:
+
+* Blur
+* Decorative animation
+* Nonessential visual effects
+* Optional background processing
+
+Core launcher functionality must remain intact.
+
+---
+
+# 40. DEVELOPER / DIAGNOSTICS MODE
+
+Provide an optional diagnostics dashboard.
+
+Display:
+
+```text
+Launcher FPS
+Frame Time
+Jank
+Memory Usage
+App Count
+Search Latency
+Icon Cache
+Widget Count
+Database Size
+Startup Time
+```
+
+Provide:
+
+```text
+Export Diagnostics
+Clear Cache
+Rebuild App Index
+Reset UI State
+```
+
+Diagnostics must avoid exposing unnecessary private information.
+
+---
+
+# 41. DATA ARCHITECTURE
+
+Use:
+
+## DataStore
+
+For:
+
+* Preferences
+* User settings
+* Current configuration
+* Simple UI state
+
+## Room
+
+For:
+
+* Application metadata
+* Search history
+* Usage statistics
+* Workspace configuration
+* Layout entities
+* Theme metadata
+
+Do not store transient UI state unnecessarily.
+
+---
+
+# 42. STATE MANAGEMENT
+
+Use unidirectional state flow.
+
+Conceptual architecture:
+
+```text
+User Action
+ ↓
+Intent
+ ↓
+ViewModel / State Holder
+ ↓
+Domain Logic
+ ↓
+Repository
+ ↓
+State
+ ↓
+UI
+```
+
+The UI must not directly manipulate database state.
+
+---
+
+# 43. ERROR STATES
+
+Every feature requiring external/system resources must support:
+
+```text
+Loading
+Success
+Empty
+Error
+Unavailable
+```
+
+Example:
+
+Instead of displaying a crash when weather data is unavailable:
+
+```text
+Weather
+—
+```
+
+The launcher continues functioning.
+
+---
+
+# 44. CONFIGURATION VALIDATION
+
+All imported themes/rices must be validated before activation.
+
+Process:
+
+```text
+Import
+ ↓
+Parse
+ ↓
+Validate
+ ↓
+Migrate
+ ↓
+Preview
+ ↓
+Apply
+```
+
+Invalid configurations must be rejected safely.
+
+The current configuration must remain intact.
+
+---
+
+# 45. CONFIGURATION MIGRATION
+
+All persistent schemas must support versioning.
+
+Example:
+
+```text
+Schema v1
+ ↓
+Migration
+ ↓
+Schema v2
+ ↓
+Migration
+ ↓
+Schema v3
+```
+
+Never assume stored data is always the latest version.
+
+---
+
+# 46. BACKUP AND RESTORE
+
+Export format should contain:
+
+```text
+Theme
+Layout
+Typography
+Icons
+Gestures
+Workspaces
+App mappings
+Dock
+Search settings
+Animation settings
+```
+
+Do NOT export:
+
+* Application private data
+* Authentication credentials
+* Sensitive system data
+
+---
+
+# 47. PRIVACY
+
+Default:
+
+```text
+No account
+No advertising
+No tracking
+No analytics
+No cloud requirement
+No telemetry
+```
+
+Core launcher functionality must work offline.
+
+If future analytics are ever introduced, they must be explicitly opt-in.
+
+---
+
+# 48. SECURITY
+
+Never execute arbitrary code from:
+
+* Themes
+* Rice files
+* Layout files
+* Gesture configurations
+* Imported data
+
+All imported configuration must be treated as untrusted data.
+
+The command palette must only execute predefined internal actions.
+
+---
+
+# 49. OEM COMPATIBILITY
+
+The application must be tested against representative Android environments, including:
+
+```text
+Google Pixel / AOSP
+Samsung One UI
+OnePlus OxygenOS
+Xiaomi HyperOS
+Motorola
+Nothing OS
+OPPO ColorOS
+Vivo Funtouch OS
+```
+
+The exact supported matrix must be finalized during QA.
+
+OEM-specific behavior must be documented rather than hidden behind fragile hacks.
+
+---
+
+# 50. ANDROID VERSION COMPATIBILITY
+
+Initial target:
+
+```text
+Android 10+
+```
+
+The implementation must account for API-level differences.
+
+Use capability detection where necessary:
+
+```text
+if supported:
+    enable feature
+else:
+    hide or disable feature gracefully
+```
+
+Never crash because an API is unavailable.
+
+---
+
+# 51. EDGE-CASE REQUIREMENTS
+
+The launcher must handle at minimum:
+
+| Scenario                     | Expected Result           |
+| ---------------------------- | ------------------------- |
+| No applications              | Empty state               |
+| Thousands of apps            | Search remains responsive |
+| App installed                | Index updated             |
+| App uninstalled              | Removed from index        |
+| App updated                  | Metadata refreshed        |
+| App disabled                 | State updated             |
+| Missing icon                 | Fallback icon             |
+| Widget failure               | Placeholder               |
+| Invalid theme                | Safe rejection            |
+| Corrupted configuration      | Recovery                  |
+| Process killed               | State restored            |
+| Device reboot                | Launcher restored         |
+| Font scaling 200%            | UI remains usable         |
+| Display scaling              | UI adapts                 |
+| Low memory                   | Caches reduced            |
+| No internet                  | Core functionality works  |
+| Permission denied            | Feature degrades          |
+| Unsupported API              | Feature disabled          |
+| Work profile                 | Correct profile behavior  |
+| Private Space                | Respect Android behavior  |
+| Rapid gestures               | No duplicated actions     |
+| Rapid app launches           | No UI corruption          |
+| Repeated theme changes       | No memory leak            |
+| Repeated workspace switching | Stable state              |
+| Widget resize                | Layout remains valid      |
+
+---
+
+# 52. TESTING STRATEGY
+
+## Unit Tests
+
+Test:
+
+* Search normalization
+* Search ranking
+* Fuzzy matching
+* Theme parsing
+* Theme validation
+* Layout validation
+* Gesture mapping
+* Workspace logic
+* Configuration migration
+* Repository behavior
+
+## Integration Tests
+
+Test:
+
+* Package changes
+* App installation/removal
+* Widget lifecycle
+* Database migrations
+* Theme import/export
+* Process recreation
+* State restoration
+
+## UI Tests
+
+Test:
+
+* Home
+* App drawer
+* Search
+* Settings
+* Gestures
+* Workspaces
+* Rice Studio
+* Widget management
+
+## Performance Tests
+
+Use Android benchmarking tools to measure:
+
+* Startup
+* Search
+* App drawer
+* Workspace switching
+* Scrolling
+* Rendering
+* Memory
+
+---
+
+# 53. STRESS TESTING
+
+Test with:
+
+```text
+10 apps
+100 apps
+500 apps
+1,000 apps
+2,000+ apps
+```
+
+Repeated workflows:
+
+```text
+Open drawer
+ ↓
+Search
+ ↓
+Launch app
+ ↓
+Return
+ ↓
+Switch workspace
+ ↓
+Open settings
+ ↓
+Change theme
+ ↓
+Return home
+```
+
+Repeat at scale.
+
+Monitor:
+
+* Crashes
+* ANRs
+* Memory
+* Frame time
+* Jank
+* State corruption
+* Search latency
+* Startup time
+
+---
+
+# 54. DEVELOPMENT ARCHITECTURE
+
+Recommended structure:
+
+```text
+app/
+
+core/
+    common/
+    platform/
+    design-system/
+    performance/
+    logging/
+    testing/
+
+data/
+    database/
+    datastore/
+    app-index/
+    icon-cache/
+    themes/
+
+domain/
+    apps/
+    search/
+    workspaces/
+    gestures/
+    themes/
+    widgets/
+    layouts/
+
+feature/
+    home/
+    appdrawer/
+    search/
+    workspace/
+    customization/
+    ricestudio/
+    settings/
+    diagnostics/
+```
+
+Do not over-modularize prematurely.
+
+Create module boundaries where they provide real architectural or build-time value.
+
+---
+
+# 55. CODING STANDARDS
+
+Antigravity must follow these rules:
+
+1. Use Kotlin idioms.
+2. Prefer immutable state.
+3. Avoid unnecessary mutable global state.
+4. Keep UI logic out of repositories.
+5. Keep business logic out of Composables.
+6. Avoid blocking the main thread.
+7. Avoid unnecessary recomposition.
+8. Avoid unnecessary dependencies.
+9. Use lifecycle-aware collection.
+10. Handle nullable/platform APIs safely.
+11. Never suppress warnings without justification.
+12. Never use arbitrary delays to hide race conditions.
+13. Never use hard-coded device dimensions.
+14. Never use fake system data.
+15. Never introduce a workaround without documenting why it is necessary.
+
+---
+
+# 56. ANTIGRAVITY DEVELOPMENT RULES
+
+Antigravity must behave as an engineering agent, not as a visual prototyping tool.
+
+## Rule 1 — Inspect Before Modifying
+
+Before changing code:
+
+* Inspect existing architecture
+* Inspect related files
+* Understand dependencies
+* Identify state ownership
+
+## Rule 2 — Small Implementation Steps
+
+Never implement multiple major subsystems simultaneously.
+
+## Rule 3 — Compile Frequently
+
+After every meaningful implementation:
+
+```text
+Build
+ ↓
+Test
+ ↓
+Lint
+ ↓
+Inspect errors
+ ↓
+Fix
+```
+
+## Rule 4 — No Fake Completion
+
+Never mark a feature complete if:
+
+* It is mocked
+* It is hard-coded
+* It only works on one screen
+* Persistence is missing
+* Error handling is missing
+* Tests are missing where appropriate
+
+## Rule 5 — Preserve Existing Functionality
+
+Do not rewrite working systems merely to make code appear cleaner.
+
+## Rule 6 — Performance Is a Requirement
+
+Every major feature must consider:
+
+* CPU cost
+* Memory cost
+* Rendering cost
+* Startup cost
+* Battery impact
+
+## Rule 7 — Android Restrictions
+
+Never attempt to bypass Android platform security or API restrictions.
+
+---
+
+# 57. IMPLEMENTATION ROADMAP
+
+## Phase 0 — Foundation
+
+Implement:
+
+* Android project
+* Kotlin
+* Compose
+* Gradle
+* Hilt
+* DataStore
+* Room
+* Design system
+* Testing framework
+* CI
+
+Deliverable:
+
+**Compiling launcher shell.**
+
+---
+
+## Phase 1 — Launcher Core
+
+Implement:
+
+* Default launcher role
+* Home intent
+* App launching
+* Package discovery
+* Basic home screen
+
+Deliverable:
+
+**Functional minimal launcher.**
+
+---
+
+## Phase 2 — Application Index
+
+Implement:
+
+* Application database
+* Package change handling
+* Icon cache
+* Application metadata
+
+Deliverable:
+
+**Fast local application index.**
+
+---
+
+## Phase 3 — Home Experience
+
+Implement:
+
+* Clock
+* Date
+* App grid
+* Dock
+* Search
+* Wallpaper
+* Layout engine
+
+Deliverable:
+
+**Daily-usable launcher.**
+
+---
+
+## Phase 4 — App Drawer
+
+Implement:
+
+* Drawer
+* Search
+* Fuzzy matching
+* Ranking
+* Favorites
+* Recent apps
+* Shortcuts
+
+Deliverable:
+
+**Rofi-inspired Android app launcher.**
+
+---
+
+## Phase 5 — Gesture Engine
+
+Implement:
+
+* Gesture recognition
+* Action mapping
+* Custom gestures
+* Gesture settings
+
+Deliverable:
+
+**Gesture-driven launcher.**
+
+---
+
+## Phase 6 — Workspace Engine
+
+Implement:
+
+* Workspace model
+* Workspace switching
+* Workspace persistence
+* Per-workspace configuration
+
+Deliverable:
+
+**Hyprland-inspired workflow.**
+
+---
+
+## Phase 7 — Theme Engine
+
+Implement:
+
+* Theme model
+* Color system
+* Typography
+* Icon configuration
+* Animation configuration
+* Wallpaper configuration
+
+Deliverable:
+
+**Complete theming system.**
+
+---
+
+## Phase 8 — Customization
+
+Implement:
+
+* Layout editor
+* Dock customization
+* Search customization
+* App grid customization
+* Typography editor
+* Icon customization
+
+Deliverable:
+
+**Advanced customization system.**
+
+---
+
+## Phase 9 — Rice Studio
+
+Implement:
+
+* Live preview
+* Draft state
+* Save
+* Duplicate
+* Export
+* Import
+* Validation
+* Migration
+
+Deliverable:
+
+**Complete rice creation environment.**
+
+---
+
+## Phase 10 — Widgets
+
+Implement:
+
+* Widget picker
+* Widget host
+* Widget placement
+* Resize
+* Persistence
+* Restoration
+* Error handling
+
+Deliverable:
+
+**Production widget system.**
+
+---
+
+## Phase 11 — Diagnostics
+
+Implement:
+
+* Startup metrics
+* Search latency
+* Frame metrics
+* Memory metrics
+* Cache statistics
+* Database statistics
+* Diagnostic export
+
+Deliverable:
+
+**Performance engineering dashboard.**
+
+---
+
+## Phase 12 — Hardening
+
+Perform:
+
+* OEM testing
+* Android version testing
+* Process-death testing
+* Low-memory testing
+* Configuration testing
+* Widget testing
+* Large app-library testing
+* Accessibility testing
+* Stress testing
+
+Deliverable:
+
+**Release candidate.**
+
+---
+
+# 58. MVP DEFINITION
+
+The first usable release must contain:
+
+```text
+Default Launcher
++
+Home Screen
++
+App Drawer
++
+Application Search
++
+Application Index
++
+Icon Cache
++
+Basic Gestures
++
+Basic Themes
++
+Basic Customization
++
+Persistent Configuration
+```
+
+Do not delay the first usable build until every advanced feature is complete.
+
+---
+
+# 59. VERSION 1.0 DEFINITION
+
+Version 1.0 should include:
+
+```text
+Launcher
+App Drawer
+Search
+App Index
+Icon System
+Home Layout
+Dock
+Gestures
+Workspaces
+Themes
+Typography
+Wallpaper
+Widgets
+Rice Studio
+Import/Export
+Accessibility
+Diagnostics
+Performance Modes
+Robust State Restoration
+```
+
+---
+
+# 60. DEFINITION OF DONE
+
+A feature is complete only when all applicable requirements are satisfied:
+
+```text
+Implementation
++
+UI
++
+State management
++
+Persistence
++
+Error handling
++
+Accessibility
++
+Testing
++
+Performance validation
++
+Documentation
++
+No compiler errors
++
+No known critical regressions
+```
+
+Visual implementation alone does not constitute completion.
+
+---
+
+# 61. SUCCESS METRICS
+
+## Performance
+
+Measure:
+
+* Cold startup time
+* Warm startup time
+* Search latency
+* App drawer opening time
+* Workspace transition time
+* Frame-time distribution
+* Jank
+* Memory usage
+* Battery impact
+
+## Stability
+
+Measure:
+
+* Crash-free sessions
+* ANR rate
+* Configuration recovery rate
+* Widget recovery
+* State restoration success
+
+## UX
+
+Measure:
+
+* Time to launch application
+* Time to find application
+* Gesture success
+* Search success
+* Configuration completion
+
+---
+
+# 62. PRODUCT QUALITY BAR
+
+HyprLauncher should not be considered production-ready merely because:
+
+* It looks good
+* It compiles
+* The demo works
+* The home screen is attractive
+
+Production readiness requires:
+
+```text
+Correct Android integration
++
+Reliable state management
++
+Performance
++
+Accessibility
++
+Error handling
++
+Testing
++
+OEM resilience
++
+Configuration migration
++
+Process-death recovery
++
+Long-term maintainability
+```
+
+---
+
+# 63. FINAL PRODUCT REQUIREMENT
+
+The final application must feel like a purpose-built Android launcher created by engineers who understand both:
+
+**Android application architecture**
+
+and
+
+**Linux desktop/rice culture.**
+
+It must not feel like:
+
+* A generic launcher
+* A WebView
+* A mock Linux desktop
+* An AI-generated UI concept
+* A collection of disconnected features
+* A visually impressive but fragile prototype
+
+The product's identity should come from its **interaction model, customization system, performance, and design system**, not merely from adding Linux icons or terminal-looking text.
+
+---
+
+# 64. MASTER ENGINEERING PRINCIPLE
+
+Every feature must pass this test:
+
+> **Does this feature improve the user's workflow enough to justify its CPU cost, memory cost, rendering cost, battery cost, maintenance cost, and complexity?**
+
+If the answer is no, do not implement the feature.
+
+---
+
+# 65. ANTIGRAVITY EXECUTION DIRECTIVE
+
+Antigravity must use this PRD as the project's source of truth.
+
+Implementation must proceed sequentially.
+
+Do not attempt to build the entire application in a single generation.
+
+For every phase:
+
+1. Inspect the current project.
+2. Identify the relevant architecture.
+3. Implement only the requested phase.
+4. Compile the application.
+5. Run relevant tests.
+6. Run static analysis.
+7. Fix all discovered issues.
+8. Review performance implications.
+9. Verify existing functionality.
+10. Document architectural decisions.
+11. Only then proceed to the next phase.
+
+Do not replace functional implementations with placeholders.
+
+Do not claim functionality that has not been implemented and tested.
+
+Do not bypass Android restrictions.
+
+Do not introduce unnecessary dependencies.
+
+Do not sacrifice performance for decorative effects.
+
+Do not sacrifice accessibility for visual design.
+
+Do not sacrifice stability for customization.
+
+The final objective is:
+
+**A production-grade, extremely responsive, deeply customizable, Linux-inspired Android launcher with a coherent architecture and robust failure handling.**

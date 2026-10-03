@@ -81,6 +81,7 @@ fun HomeScreen(
     onRemoveWidget: (widgetId: String) -> Unit = {},
     onOpenDrawer: () -> Unit = {},
     onOpenRiceStudio: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
     onGesture: (GestureType) -> Unit = {},
     onCreateWorkspace: (String) -> Unit = {},
     onRenameWorkspace: (Int, String) -> Unit = { _, _ -> },
@@ -142,6 +143,7 @@ fun HomeScreen(
                         onOpenCustomization = { showCustomizationDialog = true },
                         onOpenRiceStudio = onOpenRiceStudio,
                         onOpenWidgetPicker = { showWidgetPicker = true },
+                        onOpenDiagnostics = onOpenDiagnostics,
                         onOpenDrawer = onOpenDrawer,
                         performanceModeName = uiState.preferences.performanceMode.name
                     )
@@ -294,7 +296,9 @@ fun HomeScreen(
 
                 // Waybar Footer Telemetry
                 HyprSurfaceCard(
-                    modifier = Modifier.fillMaxWidth(0.96f),
+                    modifier = Modifier
+                        .fillMaxWidth(0.96f)
+                        .clickable { onOpenDiagnostics() },
                     backgroundColor = HyprTheme.colors.surface
                 ) {
                     Row(
@@ -417,6 +421,7 @@ private fun WaybarTopBar(
     onOpenCustomization: () -> Unit,
     onOpenRiceStudio: () -> Unit,
     onOpenWidgetPicker: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
     onOpenDrawer: () -> Unit,
     performanceModeName: String
 ) {
@@ -537,6 +542,20 @@ private fun WaybarTopBar(
             Surface(
                 shape = RoundedCornerShape(4.dp),
                 color = HyprTheme.colors.surfaceElevated,
+                border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accentSecondary),
+                modifier = Modifier.clickable { onOpenDiagnostics() }
+            ) {
+                Text(
+                    text = "perf",
+                    style = HyprTheme.typography.statusModule,
+                    color = HyprTheme.colors.accentSecondary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = HyprTheme.colors.surfaceElevated,
                 border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accent),
                 modifier = Modifier.clickable { onOpenDrawer() }
             ) {
@@ -548,14 +567,26 @@ private fun WaybarTopBar(
                     fontWeight = FontWeight.Bold
                 )
             }
-            HyprStatusBadge(
-                text = "arch",
-                accentColor = HyprTheme.colors.accent
-            )
-            HyprStatusBadge(
-                text = performanceModeName.take(4).lowercase(),
-                accentColor = HyprTheme.colors.accentSecondary
-            )
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = Color.Transparent,
+                modifier = Modifier.clickable { onOpenDiagnostics() }
+            ) {
+                HyprStatusBadge(
+                    text = "arch",
+                    accentColor = HyprTheme.colors.accent
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = Color.Transparent,
+                modifier = Modifier.clickable { onOpenDiagnostics() }
+            ) {
+                HyprStatusBadge(
+                    text = performanceModeName.take(4).lowercase(),
+                    accentColor = HyprTheme.colors.accentSecondary
+                )
+            }
         }
     }
 }

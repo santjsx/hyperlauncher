@@ -8,6 +8,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.hyprlauncher.feature.diagnostics.DiagnosticsScreen
+import com.hyprlauncher.feature.diagnostics.DiagnosticsViewModel
 import com.hyprlauncher.feature.drawer.DrawerScreen
 import com.hyprlauncher.feature.drawer.DrawerViewModel
 import com.hyprlauncher.feature.home.HomeScreen
@@ -37,6 +39,7 @@ fun MainNavigation() {
                     onRemoveWidget = viewModel::removeWidget,
                     onOpenDrawer = { backStack.add(DrawerKey) },
                     onOpenRiceStudio = { backStack.add(RiceStudioKey) },
+                    onOpenDiagnostics = { backStack.add(DiagnosticsKey) },
                     onGesture = { gesture ->
                         viewModel.onGestureTriggered(gesture, onOpenDrawer = { backStack.add(DrawerKey) })
                     },
@@ -84,6 +87,13 @@ fun MainNavigation() {
                 val studioViewModel: RiceStudioViewModel = hiltViewModel()
                 RiceStudioScreen(
                     viewModel = studioViewModel,
+                    onNavigateBack = { backStack.removeLastOrNull() }
+                )
+            }
+            entry<DiagnosticsKey> {
+                val diagViewModel: DiagnosticsViewModel = hiltViewModel()
+                DiagnosticsScreen(
+                    viewModel = diagViewModel,
                     onNavigateBack = { backStack.removeLastOrNull() }
                 )
             }

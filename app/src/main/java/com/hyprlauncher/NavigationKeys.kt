@@ -11,3 +11,6 @@ data object DrawerKey : NavKey
 
 @Serializable
 data object RiceStudioKey : NavKey
+
+@Serializable
+data object DiagnosticsKey : NavKey

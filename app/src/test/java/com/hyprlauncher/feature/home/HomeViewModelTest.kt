@@ -17,11 +17,14 @@ import com.hyprlauncher.core.platform.DefaultPackageDiscoveryManager
 import com.hyprlauncher.core.platform.LaunchResult
 import com.hyprlauncher.data.database.HyprDatabase
 import com.hyprlauncher.data.database.dao.AppDao
-import com.hyprlauncher.data.database.dao.WorkspaceDao
 import com.hyprlauncher.data.database.entity.AppEntity
 import com.hyprlauncher.data.datastore.DefaultLauncherPreferencesRepository
 import com.hyprlauncher.data.datastore.LauncherPreferencesRepository
+import com.hyprlauncher.data.repository.AppRepository
 import com.hyprlauncher.data.repository.DefaultAppRepository
+import com.hyprlauncher.data.repository.DefaultWorkspaceRepository
+import com.hyprlauncher.data.repository.WorkspaceRepository
+import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
 import com.hyprlauncher.domain.usecase.DiscoverAndIndexAppsUseCase
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
 import com.hyprlauncher.domain.usecase.LaunchAppUseCase
@@ -36,6 +39,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -58,7 +62,7 @@ class HomeViewModelTest {
     private lateinit var context: Context
     private lateinit var database: HyprDatabase
     private lateinit var appDao: AppDao
-    private lateinit var workspaceDao: WorkspaceDao
+    private lateinit var workspaceRepository: WorkspaceRepository
     private lateinit var preferencesRepository: LauncherPreferencesRepository
     private lateinit var gestureRepository: GestureRepository
     private lateinit var gestureActionExecutor: GestureActionExecutor
@@ -72,7 +76,7 @@ class HomeViewModelTest {
             .allowMainThreadQueries()
             .build()
         appDao = database.appDao()
-        workspaceDao = database.workspaceDao()
+        workspaceRepository = DefaultWorkspaceRepository(database.workspaceDao())
 
         val dataStore = PreferenceDataStoreFactory.create(
             scope = testScope,
@@ -106,7 +110,7 @@ class HomeViewModelTest {
 
         viewModel = HomeViewModel(
             preferencesRepository = preferencesRepository,
-            workspaceDao = workspaceDao,
+            workspaceRepository = workspaceRepository,
             appRepository = appRepository,
             gestureRepository = gestureRepository,
             gestureActionExecutor = gestureActionExecutor,
@@ -199,5 +203,84 @@ class HomeViewModelTest {
         viewModel.setGestureBinding(GestureType.DOUBLE_TAP, LauncherAction.OpenSettings)
         val state = viewModel.uiState.first { it.gestureBindings[GestureType.DOUBLE_TAP] == LauncherAction.OpenSettings }
         assertEquals(LauncherAction.OpenSettings, state.gestureBindings[GestureType.DOUBLE_TAP])
+    }
+
+    @Test
+    fun workspaceSelectionUpdatesActiveWorkspaceInUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        val initial = viewModel.uiState.first { it.workspaces.isNotEmpty() }
+        assertEquals(1, initial.preferences.activeWorkspaceId)
+        assertEquals("Main", initial.activeWorkspace?.name)
+
+        viewModel.onWorkspaceSelected(3)
+        val updated = viewModel.uiState.first { it.preferences.activeWorkspaceId == 3 }
+        assertEquals(3, updated.preferences.activeWorkspaceId)
+        assertEquals("Dev", updated.activeWorkspace?.name)
+    }
+
+    @Test
+    fun createWorkspaceAddsWorkspaceAndSwitchesToIt() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() }
+
+        viewModel.createWorkspace("Hacking")
+        val updated = viewModel.uiState.first {
+            it.workspaces.size == 6 && it.preferences.activeWorkspaceId == 6
+        }
+        assertEquals(6, updated.preferences.activeWorkspaceId)
+        assertEquals("Hacking", updated.activeWorkspace?.name)
+    }
+
+    @Test
+    fun renameWorkspaceUpdatesNameInUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() }
+
+        viewModel.renameWorkspace(2, "Office")
+        val updated = viewModel.uiState.first {
+            it.workspaces.any { ws -> ws.id == 2 && ws.name == "Office" }
+        }
+        val officeWs = updated.workspaces.first { it.id == 2 }
+        assertEquals("Office", officeWs.name)
+    }
+
+    @Test
+    fun deleteWorkspaceRemovesAndFallsBackIfActive() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() }
+
+        viewModel.onWorkspaceSelected(5)
+        viewModel.uiState.first { it.preferences.activeWorkspaceId == 5 }
+
+        viewModel.deleteWorkspace(5)
+        val updated = viewModel.uiState.first {
+            it.workspaces.size == 4 && it.preferences.activeWorkspaceId != 5
+        }
+        assertEquals(false, updated.workspaces.any { it.id == 5 })
+        assertTrue(updated.preferences.activeWorkspaceId != 5)
+    }
+
+    @Test
+    fun assignedWorkspaceAppsFilterDisplaysOnlyAssignedApps() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() && it.apps.isNotEmpty() }
+
+        // Configure workspace 3 ("Dev") with assigned apps: Termux and Firefox
+        val devConfig = WorkspaceLayoutConfig(
+            assignedPackageNames = listOf("com.termux", "org.mozilla.firefox")
+        )
+        viewModel.updateWorkspaceLayout(3, devConfig)
+
+        // Switch to workspace 3
+        viewModel.onWorkspaceSelected(3)
+        val state = viewModel.uiState.first {
+            it.preferences.activeWorkspaceId == 3 && it.activeWorkspace?.layoutConfig?.assignedPackageNames?.isNotEmpty() == true
+        }
+
+        // Only the 2 assigned apps should be present in filteredApps
+        assertEquals(2, state.filteredApps.size)
+        val packages = state.filteredApps.map { it.packageName }.toSet()
+        assertTrue(packages.contains("com.termux"))
+        assertTrue(packages.contains("org.mozilla.firefox"))
     }
 }

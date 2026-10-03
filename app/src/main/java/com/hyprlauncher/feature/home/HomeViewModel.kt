@@ -9,12 +9,13 @@ import com.hyprlauncher.core.gesture.GestureRepository
 import com.hyprlauncher.core.gesture.GestureType
 import com.hyprlauncher.core.gesture.LauncherAction
 import com.hyprlauncher.core.platform.LaunchResult
-import com.hyprlauncher.data.database.dao.WorkspaceDao
 import com.hyprlauncher.data.database.entity.AppEntity
-import com.hyprlauncher.data.database.entity.WorkspaceEntity
 import com.hyprlauncher.data.datastore.LauncherPreferences
 import com.hyprlauncher.data.datastore.LauncherPreferencesRepository
 import com.hyprlauncher.data.repository.AppRepository
+import com.hyprlauncher.data.repository.WorkspaceRepository
+import com.hyprlauncher.domain.model.Workspace
+import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
 import com.hyprlauncher.domain.usecase.LaunchAppUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,7 +30,8 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val preferences: LauncherPreferences = LauncherPreferences(),
-    val workspaces: List<WorkspaceEntity> = emptyList(),
+    val workspaces: List<Workspace> = emptyList(),
+    val activeWorkspace: Workspace? = null,
     val apps: List<AppEntity> = emptyList(),
     val dockApps: List<AppEntity> = emptyList(),
     val filteredApps: List<AppEntity> = emptyList(),
@@ -45,7 +47,7 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val preferencesRepository: LauncherPreferencesRepository,
-    private val workspaceDao: WorkspaceDao,
+    private val workspaceRepository: WorkspaceRepository,
     private val appRepository: AppRepository,
     private val launchAppUseCase: LaunchAppUseCase,
     private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase,
@@ -55,7 +57,7 @@ class HomeViewModel @Inject constructor(
 
     private data class CoreData(
         val preferences: LauncherPreferences,
-        val workspaces: List<WorkspaceEntity>,
+        val workspaces: List<Workspace>,
         val apps: List<AppEntity>,
         val gestureBindings: Map<GestureType, LauncherAction>
     )
@@ -67,16 +69,7 @@ class HomeViewModel @Inject constructor(
     init {
         // Seed default workspaces if none exist (PRD Section 17)
         viewModelScope.launch {
-            if (workspaceDao.getWorkspaceCount() == 0) {
-                val defaultWorkspaces = listOf(
-                    WorkspaceEntity(id = 1, name = "Main", orderIndex = 1, iconName = "terminal"),
-                    WorkspaceEntity(id = 2, name = "Work", orderIndex = 2, iconName = "briefcase"),
-                    WorkspaceEntity(id = 3, name = "Dev", orderIndex = 3, iconName = "code"),
-                    WorkspaceEntity(id = 4, name = "Media", orderIndex = 4, iconName = "play"),
-                    WorkspaceEntity(id = 5, name = "Games", orderIndex = 5, iconName = "gamepad")
-                )
-                workspaceDao.upsertWorkspaces(defaultWorkspaces)
-            }
+            workspaceRepository.ensureDefaultWorkspaces()
         }
 
         // Perform initial application discovery & indexing via AppRepository
@@ -87,7 +80,7 @@ class HomeViewModel @Inject constructor(
 
     private val coreDataFlow = combine(
         preferencesRepository.preferences,
-        workspaceDao.getAllWorkspaces(),
+        workspaceRepository.allWorkspaces,
         appRepository.allApps,
         gestureRepository.gestureBindings
     ) { prefs, workspaces, apps, gestures ->
@@ -102,14 +95,24 @@ class HomeViewModel @Inject constructor(
     ) { coreData, query, roleStatus, launchResult ->
         val apps = coreData.apps
         val prefs = coreData.preferences
+        val activeWs = coreData.workspaces.firstOrNull { it.id == prefs.activeWorkspaceId }
+            ?: coreData.workspaces.firstOrNull()
+
+        // Per-workspace assigned apps filter (PRD Section 17)
+        val workspaceApps = if (activeWs != null && activeWs.layoutConfig.assignedPackageNames.isNotEmpty()) {
+            val assignedSet = activeWs.layoutConfig.assignedPackageNames.toSet()
+            apps.filter { it.packageName in assignedSet }
+        } else {
+            apps
+        }
 
         val filtered = if (query.isNotBlank()) {
-            apps.filter {
+            workspaceApps.filter {
                 it.label.contains(query, ignoreCase = true) ||
                 it.packageName.contains(query, ignoreCase = true)
             }
         } else {
-            apps
+            workspaceApps
         }
 
         val dockApps = if (prefs.dockPackageNames.isNotEmpty()) {
@@ -123,6 +126,7 @@ class HomeViewModel @Inject constructor(
         HomeUiState(
             preferences = prefs,
             workspaces = coreData.workspaces,
+            activeWorkspace = activeWs,
             apps = apps,
             dockApps = dockApps,
             filteredApps = filtered,
@@ -222,6 +226,70 @@ class HomeViewModel @Inject constructor(
     fun updateWallpaperSettings(dim: Float, amoledMode: Boolean) {
         viewModelScope.launch {
             preferencesRepository.updateWallpaperSettings(dim, amoledMode)
+        }
+    }
+
+    fun createWorkspace(name: String) {
+        viewModelScope.launch {
+            val created = workspaceRepository.createWorkspace(name)
+            preferencesRepository.updateActiveWorkspace(created.id)
+        }
+    }
+
+    fun renameWorkspace(id: Int, newName: String) {
+        viewModelScope.launch {
+            val existing = workspaceRepository.getWorkspaceById(id) ?: return@launch
+            workspaceRepository.updateWorkspace(existing.copy(name = newName))
+        }
+    }
+
+    fun deleteWorkspace(id: Int) {
+        viewModelScope.launch {
+            val all = uiState.value.workspaces
+            if (all.size <= 1) return@launch
+            val wasDeleted = workspaceRepository.deleteWorkspace(id)
+            if (wasDeleted && uiState.value.preferences.activeWorkspaceId == id) {
+                val fallback = all.firstOrNull { it.id != id }?.id ?: 1
+                preferencesRepository.updateActiveWorkspace(fallback)
+            }
+        }
+    }
+
+    fun reorderWorkspaces(workspaceIds: List<Int>) {
+        viewModelScope.launch {
+            workspaceRepository.reorderWorkspaces(workspaceIds)
+        }
+    }
+
+    fun updateWorkspaceLayout(workspaceId: Int, config: WorkspaceLayoutConfig) {
+        viewModelScope.launch {
+            workspaceRepository.updateWorkspaceLayout(workspaceId, config)
+        }
+    }
+
+    fun assignAppToWorkspace(workspaceId: Int, packageName: String) {
+        viewModelScope.launch {
+            val ws = workspaceRepository.getWorkspaceById(workspaceId) ?: return@launch
+            val current = ws.layoutConfig.assignedPackageNames
+            if (packageName !in current) {
+                val updatedConfig = ws.layoutConfig.copy(
+                    assignedPackageNames = current + packageName
+                )
+                workspaceRepository.updateWorkspaceLayout(workspaceId, updatedConfig)
+            }
+        }
+    }
+
+    fun removeAppFromWorkspace(workspaceId: Int, packageName: String) {
+        viewModelScope.launch {
+            val ws = workspaceRepository.getWorkspaceById(workspaceId) ?: return@launch
+            val current = ws.layoutConfig.assignedPackageNames
+            if (packageName in current) {
+                val updatedConfig = ws.layoutConfig.copy(
+                    assignedPackageNames = current - packageName
+                )
+                workspaceRepository.updateWorkspaceLayout(workspaceId, updatedConfig)
+            }
         }
     }
 }

@@ -12,17 +12,40 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hyprlauncher.core.designsystem.theme.HyprTheme
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
+
 /**
  * Wallpaper & Surface Canvas conforming to PRD Section 27.
- * Supports AMOLED true black, dimmed background, and subtle technical grid points.
+ * Supports AMOLED true black, dimmed background, custom wallpaper image, and subtle technical grid points.
  */
 @Composable
 fun HomeWallpaperSurface(
     amoledMode: Boolean,
     dimLevel: Float,
+    wallpaperUri: String? = null,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val context = LocalContext.current
+    val customBitmap = remember(wallpaperUri) {
+        if (!wallpaperUri.isNullOrBlank()) {
+            runCatching {
+                val uri = Uri.parse(wallpaperUri)
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }
+            }.getOrNull()
+        } else {
+            null
+        }
+    }
+
     val bgColor = if (amoledMode) Color.Black else HyprTheme.colors.background
     val gridColor = if (amoledMode) Color.Transparent else HyprTheme.colors.border.copy(alpha = 0.35f)
 
@@ -49,6 +72,15 @@ fun HomeWallpaperSurface(
                 }
             }
     ) {
+        if (customBitmap != null && !amoledMode) {
+            Image(
+                bitmap = customBitmap.asImageBitmap(),
+                contentDescription = "Custom Wallpaper",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+
         // Scrim / Dimming layer
         if (dimLevel > 0f) {
             Box(

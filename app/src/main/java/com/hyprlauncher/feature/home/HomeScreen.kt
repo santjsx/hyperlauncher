@@ -1,6 +1,14 @@
 package com.hyprlauncher.feature.home
 
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.hyprlauncher.core.designsystem.component.HyprStatusBadge
 import com.hyprlauncher.core.designsystem.component.HyprSurfaceCard
 import com.hyprlauncher.core.designsystem.theme.HyprTheme
-import com.hyprlauncher.data.database.entity.WorkspaceEntity
+import com.hyprlauncher.domain.model.Workspace
 import com.hyprlauncher.feature.home.component.HomeAppGrid
 import com.hyprlauncher.feature.home.component.HomeClock
 import com.hyprlauncher.core.gesture.GestureType
@@ -32,11 +44,13 @@ import com.hyprlauncher.core.gesture.hyprGestureHandler
 import com.hyprlauncher.feature.home.component.HomeDock
 import com.hyprlauncher.feature.home.component.HomeSearchBar
 import com.hyprlauncher.feature.home.component.HomeWallpaperSurface
+import com.hyprlauncher.feature.home.component.WorkspaceManagementDialog
 
 /**
- * HyprLauncher Home Screen conforming to PRD Phase 3 (Sections 8, 9, 10, 11, 24, 27)
- * and Phase 5 Gesture recognition.
- * Implements a declarative layout engine orchestrating the Waybar, Clock, Search bar, App grid, Dock, and Gestures.
+ * HyprLauncher Home Screen conforming to PRD Phase 3 (Sections 8, 9, 10, 11, 24, 27),
+ * Phase 5 Gesture recognition, and Phase 6 Workspace Engine.
+ * Implements a declarative layout engine orchestrating the Waybar, Clock, Search bar, App grid, Dock, Gestures,
+ * and Hyprland-inspired animated workspace transitions.
  */
 @Composable
 fun HomeScreen(
@@ -45,14 +59,25 @@ fun HomeScreen(
     onSearchQueryChange: (String) -> Unit,
     onOpenDrawer: () -> Unit = {},
     onGesture: (GestureType) -> Unit = {},
+    onCreateWorkspace: (String) -> Unit = {},
+    onRenameWorkspace: (Int, String) -> Unit = { _, _ -> },
+    onDeleteWorkspace: (Int) -> Unit = {},
     onAppClick: (String, String?) -> Unit,
     onSetDefaultLauncher: () -> Unit,
     loadIcon: suspend (String) -> Bitmap? = { null },
     modifier: Modifier = Modifier
 ) {
+    var showWorkspaceManager by remember { mutableStateOf(false) }
+
+    val activeWallpaperUri = uiState.activeWorkspace?.wallpaperUri
+        ?: uiState.activeWorkspace?.layoutConfig?.wallpaperUri
+    val activeDimLevel = uiState.activeWorkspace?.layoutConfig?.wallpaperDim
+        ?: uiState.preferences.wallpaperDim
+
     HomeWallpaperSurface(
         amoledMode = uiState.preferences.wallpaperAmoledMode,
-        dimLevel = uiState.preferences.wallpaperDim,
+        dimLevel = activeDimLevel,
+        wallpaperUri = activeWallpaperUri,
         modifier = modifier
             .fillMaxSize()
             .hyprGestureHandler(onGesture = onGesture)
@@ -71,6 +96,7 @@ fun HomeScreen(
                         workspaces = uiState.workspaces,
                         activeWorkspaceId = uiState.preferences.activeWorkspaceId,
                         onWorkspaceSelected = onWorkspaceSelected,
+                        onOpenWorkspaceManager = { showWorkspaceManager = true },
                         onOpenDrawer = onOpenDrawer,
                         performanceModeName = uiState.preferences.performanceMode.name
                     )
@@ -90,7 +116,9 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Clock & Date component
-                if (uiState.preferences.showClock) {
+                val showClock = uiState.activeWorkspace?.layoutConfig?.showClock
+                    ?: uiState.preferences.showClock
+                if (showClock) {
                     Spacer(modifier = Modifier.height(10.dp))
                     HomeClock(
                         clock24Hour = uiState.preferences.clock24Hour,
@@ -101,7 +129,9 @@ fun HomeScreen(
                 }
 
                 // Interactive Rofi / Search bar
-                if (uiState.preferences.showSearchBar) {
+                val showSearchBar = uiState.activeWorkspace?.layoutConfig?.showSearchBar
+                    ?: uiState.preferences.showSearchBar
+                if (showSearchBar) {
                     HomeSearchBar(
                         query = uiState.searchQuery,
                         onQueryChange = onSearchQueryChange,
@@ -115,16 +145,35 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // App Grid
+                // App Grid with Hyprland Horizontal Workspace Transition (180ms, PRD Section 18 & 26)
                 if (uiState.preferences.showAppGrid) {
-                    HomeAppGrid(
-                        apps = uiState.filteredApps,
-                        columns = uiState.preferences.gridColumns,
-                        showLabels = uiState.preferences.showAppLabels,
-                        loadIcon = loadIcon,
-                        onAppClick = onAppClick,
+                    val effectiveColumns = uiState.activeWorkspace?.layoutConfig?.gridColumns
+                        ?: uiState.preferences.gridColumns
+
+                    AnimatedContent(
+                        targetState = uiState.preferences.activeWorkspaceId,
+                        transitionSpec = {
+                            val isForward = targetState > initialState
+                            if (isForward) {
+                                (slideInHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it } + fadeIn(animationSpec = tween(180)))
+                                    .togetherWith(slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(animationSpec = tween(180)))
+                            } else {
+                                (slideInHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it } + fadeIn(animationSpec = tween(180)))
+                                    .togetherWith(slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it } + fadeOut(animationSpec = tween(180)))
+                            }
+                        },
+                        label = "WorkspaceGridTransition",
                         modifier = Modifier.weight(1f, fill = false)
-                    )
+                    ) { _ ->
+                        HomeAppGrid(
+                            apps = uiState.filteredApps,
+                            columns = effectiveColumns,
+                            showLabels = uiState.preferences.showAppLabels,
+                            loadIcon = loadIcon,
+                            onAppClick = onAppClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
 
@@ -175,6 +224,18 @@ fun HomeScreen(
             }
         }
     }
+
+    if (showWorkspaceManager) {
+        WorkspaceManagementDialog(
+            workspaces = uiState.workspaces,
+            activeWorkspaceId = uiState.preferences.activeWorkspaceId,
+            onSelectWorkspace = onWorkspaceSelected,
+            onCreateWorkspace = onCreateWorkspace,
+            onRenameWorkspace = onRenameWorkspace,
+            onDeleteWorkspace = onDeleteWorkspace,
+            onDismiss = { showWorkspaceManager = false }
+        )
+    }
 }
 
 @Composable
@@ -209,9 +270,10 @@ private fun DefaultLauncherBanner(onClick: () -> Unit) {
 
 @Composable
 private fun WaybarTopBar(
-    workspaces: List<WorkspaceEntity>,
+    workspaces: List<Workspace>,
     activeWorkspaceId: Int,
     onWorkspaceSelected: (Int) -> Unit,
+    onOpenWorkspaceManager: () -> Unit,
     onOpenDrawer: () -> Unit,
     performanceModeName: String
 ) {
@@ -220,7 +282,7 @@ private fun WaybarTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Workspace selector pill: [1] [2] [3] [4] [5]
+        // Workspace selector pill: [1] [2] [3] [4] [5] [+]
         Surface(
             shape = HyprTheme.shapes.small,
             color = HyprTheme.colors.surface,
@@ -232,7 +294,7 @@ private fun WaybarTopBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val displayList = if (workspaces.isNotEmpty()) workspaces else (1..5).map {
-                    WorkspaceEntity(it, "WS $it", it)
+                    Workspace(it, "WS $it", it)
                 }
 
                 displayList.forEach { ws ->
@@ -250,6 +312,20 @@ private fun WaybarTopBar(
                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                         )
                     }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color.Transparent,
+                    modifier = Modifier.clickable { onOpenWorkspaceManager() }
+                ) {
+                    Text(
+                        text = "+",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = HyprTheme.typography.statusModule,
+                        color = HyprTheme.colors.accent,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

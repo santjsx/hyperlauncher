@@ -33,6 +33,9 @@ fun MainNavigation() {
                     onGesture = { gesture ->
                         viewModel.onGestureTriggered(gesture, onOpenDrawer = { backStack.add(DrawerKey) })
                     },
+                    onCreateWorkspace = viewModel::createWorkspace,
+                    onRenameWorkspace = viewModel::renameWorkspace,
+                    onDeleteWorkspace = viewModel::deleteWorkspace,
                     onAppClick = { pkg, act -> viewModel.launchApp(pkg, act) },
                     onSetDefaultLauncher = {
                         uiState.requestDefaultIntent?.let { intent ->

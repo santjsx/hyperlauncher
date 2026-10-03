@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.hyprlauncher.data.database.HyprDatabase
 import com.hyprlauncher.data.database.dao.AppDao
+import com.hyprlauncher.data.database.dao.RiceDao
 import com.hyprlauncher.data.database.dao.WorkspaceDao
 import dagger.Module
 import dagger.Provides
@@ -37,5 +38,10 @@ object DatabaseModule {
     @Provides
     fun provideWorkspaceDao(database: HyprDatabase): WorkspaceDao {
         return database.workspaceDao()
+    }
+
+    @Provides
+    fun provideRiceDao(database: HyprDatabase): RiceDao {
+        return database.riceDao()
     }
 }

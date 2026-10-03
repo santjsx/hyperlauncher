@@ -8,3 +8,6 @@ data object HomeKey : NavKey
 
 @Serializable
 data object DrawerKey : NavKey
+
+@Serializable
+data object RiceStudioKey : NavKey

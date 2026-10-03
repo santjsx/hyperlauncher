@@ -72,6 +72,7 @@ fun CustomizationDialog(
     onPinApp: (String) -> Unit,
     onUnpinApp: (String) -> Unit,
     onResetDefaults: () -> Unit,
+    onOpenRiceStudio: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(CustomizationTab.LAYOUT) }
@@ -110,18 +111,41 @@ fun CustomizationDialog(
                         )
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = HyprTheme.colors.surfaceElevated,
-                        border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border),
-                        modifier = Modifier.clickable { onDismiss() }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "✕",
-                            style = HyprTheme.typography.monospaceMedium,
-                            color = HyprTheme.colors.textSecondary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = HyprTheme.colors.surfaceElevated,
+                            border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accent),
+                            modifier = Modifier.clickable {
+                                onDismiss()
+                                onOpenRiceStudio()
+                            }
+                        ) {
+                            Text(
+                                text = "rice studio ↗",
+                                style = HyprTheme.typography.monospaceSmall,
+                                color = HyprTheme.colors.accent,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = HyprTheme.colors.surfaceElevated,
+                            border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border),
+                            modifier = Modifier.clickable { onDismiss() }
+                        ) {
+                            Text(
+                                text = "✕",
+                                style = HyprTheme.typography.monospaceMedium,
+                                color = HyprTheme.colors.textSecondary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
 

@@ -71,6 +71,7 @@ fun HomeScreen(
     onWorkspaceSelected: (Int) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onOpenDrawer: () -> Unit = {},
+    onOpenRiceStudio: () -> Unit = {},
     onGesture: (GestureType) -> Unit = {},
     onCreateWorkspace: (String) -> Unit = {},
     onRenameWorkspace: (Int, String) -> Unit = { _, _ -> },
@@ -129,6 +130,7 @@ fun HomeScreen(
                         onOpenWorkspaceManager = { showWorkspaceManager = true },
                         onOpenThemePicker = { showThemePicker = true },
                         onOpenCustomization = { showCustomizationDialog = true },
+                        onOpenRiceStudio = onOpenRiceStudio,
                         onOpenDrawer = onOpenDrawer,
                         performanceModeName = uiState.preferences.performanceMode.name
                     )
@@ -324,6 +326,7 @@ fun HomeScreen(
             onPinApp = onPinApp,
             onUnpinApp = onUnpinApp,
             onResetDefaults = onResetCustomizationDefaults,
+            onOpenRiceStudio = onOpenRiceStudio,
             onDismiss = { showCustomizationDialog = false }
         )
     }
@@ -367,6 +370,7 @@ private fun WaybarTopBar(
     onOpenWorkspaceManager: () -> Unit,
     onOpenThemePicker: () -> Unit,
     onOpenCustomization: () -> Unit,
+    onOpenRiceStudio: () -> Unit,
     onOpenDrawer: () -> Unit,
     performanceModeName: String
 ) {
@@ -452,6 +456,20 @@ private fun WaybarTopBar(
                     text = "rice",
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.terminalGreen,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = HyprTheme.colors.surfaceElevated,
+                border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accent),
+                modifier = Modifier.clickable { onOpenRiceStudio() }
+            ) {
+                Text(
+                    text = "studio",
+                    style = HyprTheme.typography.statusModule,
+                    color = HyprTheme.colors.accent,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     fontWeight = FontWeight.Bold
                 )

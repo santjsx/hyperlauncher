@@ -12,6 +12,8 @@ import com.hyprlauncher.feature.drawer.DrawerScreen
 import com.hyprlauncher.feature.drawer.DrawerViewModel
 import com.hyprlauncher.feature.home.HomeScreen
 import com.hyprlauncher.feature.home.HomeViewModel
+import com.hyprlauncher.feature.rice.RiceStudioScreen
+import com.hyprlauncher.feature.rice.RiceStudioViewModel
 
 @Composable
 fun MainNavigation() {
@@ -30,6 +32,7 @@ fun MainNavigation() {
                     onWorkspaceSelected = viewModel::onWorkspaceSelected,
                     onSearchQueryChange = viewModel::onSearchQueryChanged,
                     onOpenDrawer = { backStack.add(DrawerKey) },
+                    onOpenRiceStudio = { backStack.add(RiceStudioKey) },
                     onGesture = { gesture ->
                         viewModel.onGestureTriggered(gesture, onOpenDrawer = { backStack.add(DrawerKey) })
                     },
@@ -71,6 +74,13 @@ fun MainNavigation() {
                     onToggleFavorite = drawerViewModel::toggleFavorite,
                     onDismiss = { backStack.removeLastOrNull() },
                     loadIcon = { pkg -> drawerViewModel.getAppIcon(pkg) }
+                )
+            }
+            entry<RiceStudioKey> {
+                val studioViewModel: RiceStudioViewModel = hiltViewModel()
+                RiceStudioScreen(
+                    viewModel = studioViewModel,
+                    onNavigateBack = { backStack.removeLastOrNull() }
                 )
             }
         }

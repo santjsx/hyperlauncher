@@ -50,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -89,7 +90,7 @@ class HomeViewModelTest {
     private lateinit var viewModel: HomeViewModel
 
     @Before
-    fun setup() = runTest(testDispatcher) {
+    fun setup() = runBlocking(testDispatcher) {
         Dispatchers.setMain(testDispatcher)
         context = ApplicationProvider.getApplicationContext()
         database = Room.inMemoryDatabaseBuilder(context, HyprDatabase::class.java)

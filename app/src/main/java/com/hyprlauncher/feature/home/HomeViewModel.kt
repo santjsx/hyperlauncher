@@ -26,6 +26,9 @@ data class HomeUiState(
     val preferences: LauncherPreferences = LauncherPreferences(),
     val workspaces: List<WorkspaceEntity> = emptyList(),
     val apps: List<AppEntity> = emptyList(),
+    val dockApps: List<AppEntity> = emptyList(),
+    val filteredApps: List<AppEntity> = emptyList(),
+    val searchQuery: String = "",
     val totalAppsIndexed: Int = 0,
     val isDefaultLauncher: Boolean = true,
     val requestDefaultIntent: Intent? = null,
@@ -42,8 +45,15 @@ class HomeViewModel @Inject constructor(
     private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase
 ) : ViewModel() {
 
+    private data class CoreData(
+        val preferences: LauncherPreferences,
+        val workspaces: List<WorkspaceEntity>,
+        val apps: List<AppEntity>
+    )
+
     private val roleStatusFlow = MutableStateFlow(getLauncherRoleStatusUseCase())
     private val lastLaunchResult = MutableStateFlow<LaunchResult?>(null)
+    private val searchQueryFlow = MutableStateFlow("")
 
     init {
         // Seed default workspaces if none exist (PRD Section 17)
@@ -66,17 +76,47 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    val uiState: StateFlow<HomeUiState> = combine(
+    private val coreDataFlow = combine(
         preferencesRepository.preferences,
         workspaceDao.getAllWorkspaces(),
-        appRepository.allApps,
+        appRepository.allApps
+    ) { prefs, workspaces, apps ->
+        CoreData(prefs, workspaces, apps)
+    }
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        coreDataFlow,
+        searchQueryFlow,
         roleStatusFlow,
         lastLaunchResult
-    ) { prefs, workspaces, apps, roleStatus, launchResult ->
+    ) { coreData, query, roleStatus, launchResult ->
+        val apps = coreData.apps
+        val prefs = coreData.preferences
+
+        val filtered = if (query.isNotBlank()) {
+            apps.filter {
+                it.label.contains(query, ignoreCase = true) ||
+                it.packageName.contains(query, ignoreCase = true)
+            }
+        } else {
+            apps
+        }
+
+        val dockApps = if (prefs.dockPackageNames.isNotEmpty()) {
+            val appMap = apps.associateBy { it.packageName }
+            prefs.dockPackageNames.mapNotNull { appMap[it] }
+        } else {
+            // Default dock takes up to 5 initial apps
+            apps.take(5)
+        }
+
         HomeUiState(
             preferences = prefs,
-            workspaces = workspaces,
+            workspaces = coreData.workspaces,
             apps = apps,
+            dockApps = dockApps,
+            filteredApps = filtered,
+            searchQuery = query,
             totalAppsIndexed = apps.size,
             isDefaultLauncher = roleStatus.isDefault,
             requestDefaultIntent = roleStatus.requestIntent,
@@ -95,6 +135,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun onSearchQueryChanged(query: String) {
+        searchQueryFlow.value = query
+    }
+
     fun launchApp(packageName: String, activityName: String? = null) {
         val result = launchAppUseCase(packageName, activityName)
         lastLaunchResult.value = result
@@ -106,5 +150,35 @@ class HomeViewModel @Inject constructor(
 
     fun refreshRoleStatus() {
         roleStatusFlow.value = getLauncherRoleStatusUseCase()
+    }
+
+    fun updateGridLayout(columns: Int, rows: Int) {
+        viewModelScope.launch {
+            preferencesRepository.updateGridLayout(columns, rows)
+        }
+    }
+
+    fun updateClockFormat(is24Hour: Boolean, showSeconds: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateClockFormat(is24Hour, showSeconds)
+        }
+    }
+
+    fun updateDockVisibility(show: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateDockVisibility(show)
+        }
+    }
+
+    fun updateAppLabelVisibility(show: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateAppLabelVisibility(show)
+        }
+    }
+
+    fun updateWallpaperSettings(dim: Float, amoledMode: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateWallpaperSettings(dim, amoledMode)
+        }
     }
 }

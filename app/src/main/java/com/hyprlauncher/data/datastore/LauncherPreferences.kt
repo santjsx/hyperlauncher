@@ -14,5 +14,15 @@ data class LauncherPreferences(
     val showDock: Boolean = true,
     val clock24Hour: Boolean = true,
     val showClockSeconds: Boolean = false,
-    val enableBlur: Boolean = true
+    val enableBlur: Boolean = true,
+    // Phase 3 Declarative Layout & Home Configuration
+    val showClock: Boolean = true,
+    val showDate: Boolean = true,
+    val showSearchBar: Boolean = true,
+    val showAppGrid: Boolean = true,
+    val showWaybar: Boolean = true,
+    val showAppLabels: Boolean = true,
+    val wallpaperDim: Float = 0.2f,
+    val wallpaperAmoledMode: Boolean = false,
+    val dockPackageNames: List<String> = emptyList()
 )

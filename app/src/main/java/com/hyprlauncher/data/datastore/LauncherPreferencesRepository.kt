@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.hyprlauncher.domain.model.PerformanceMode
@@ -23,6 +24,17 @@ interface LauncherPreferencesRepository {
     suspend fun updateGridLayout(columns: Int, rows: Int)
     suspend fun updateDockVisibility(show: Boolean)
     suspend fun updateClockFormat(is24Hour: Boolean, showSeconds: Boolean)
+    suspend fun updateLayoutVisibility(
+        showClock: Boolean? = null,
+        showDate: Boolean? = null,
+        showSearchBar: Boolean? = null,
+        showAppGrid: Boolean? = null,
+        showDock: Boolean? = null,
+        showWaybar: Boolean? = null
+    )
+    suspend fun updateAppLabelVisibility(show: Boolean)
+    suspend fun updateWallpaperSettings(dim: Float, amoledMode: Boolean)
+    suspend fun updateDockPackages(packageNames: List<String>)
 }
 
 @Singleton
@@ -40,6 +52,17 @@ class DefaultLauncherPreferencesRepository @Inject constructor(
         val CLOCK_24_HOUR = booleanPreferencesKey("clock_24_hour")
         val SHOW_CLOCK_SECONDS = booleanPreferencesKey("show_clock_seconds")
         val ENABLE_BLUR = booleanPreferencesKey("enable_blur")
+
+        // Declarative Layout & Home settings
+        val SHOW_CLOCK = booleanPreferencesKey("show_clock")
+        val SHOW_DATE = booleanPreferencesKey("show_date")
+        val SHOW_SEARCH_BAR = booleanPreferencesKey("show_search_bar")
+        val SHOW_APP_GRID = booleanPreferencesKey("show_app_grid")
+        val SHOW_WAYBAR = booleanPreferencesKey("show_waybar")
+        val SHOW_APP_LABELS = booleanPreferencesKey("show_app_labels")
+        val WALLPAPER_DIM = floatPreferencesKey("wallpaper_dim")
+        val WALLPAPER_AMOLED = booleanPreferencesKey("wallpaper_amoled")
+        val DOCK_PACKAGES = stringPreferencesKey("dock_packages")
     }
 
     override val preferences: Flow<LauncherPreferences> = dataStore.data
@@ -62,6 +85,16 @@ class DefaultLauncherPreferencesRepository @Inject constructor(
             val seconds = prefs[PreferencesKeys.SHOW_CLOCK_SECONDS] ?: false
             val blur = prefs[PreferencesKeys.ENABLE_BLUR] ?: true
 
+            val showClock = prefs[PreferencesKeys.SHOW_CLOCK] ?: true
+            val showDate = prefs[PreferencesKeys.SHOW_DATE] ?: true
+            val showSearchBar = prefs[PreferencesKeys.SHOW_SEARCH_BAR] ?: true
+            val showAppGrid = prefs[PreferencesKeys.SHOW_APP_GRID] ?: true
+            val showWaybar = prefs[PreferencesKeys.SHOW_WAYBAR] ?: true
+            val showAppLabels = prefs[PreferencesKeys.SHOW_APP_LABELS] ?: true
+            val wallpaperDim = prefs[PreferencesKeys.WALLPAPER_DIM] ?: 0.2f
+            val wallpaperAmoled = prefs[PreferencesKeys.WALLPAPER_AMOLED] ?: false
+            val dockPackages = prefs[PreferencesKeys.DOCK_PACKAGES]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+
             LauncherPreferences(
                 activeWorkspaceId = workspaceId,
                 performanceMode = mode,
@@ -71,7 +104,16 @@ class DefaultLauncherPreferencesRepository @Inject constructor(
                 showDock = dock,
                 clock24Hour = is24H,
                 showClockSeconds = seconds,
-                enableBlur = blur
+                enableBlur = blur,
+                showClock = showClock,
+                showDate = showDate,
+                showSearchBar = showSearchBar,
+                showAppGrid = showAppGrid,
+                showWaybar = showWaybar,
+                showAppLabels = showAppLabels,
+                wallpaperDim = wallpaperDim,
+                wallpaperAmoledMode = wallpaperAmoled,
+                dockPackageNames = dockPackages
             )
         }
 
@@ -114,6 +156,43 @@ class DefaultLauncherPreferencesRepository @Inject constructor(
         dataStore.edit { prefs ->
             prefs[PreferencesKeys.CLOCK_24_HOUR] = is24Hour
             prefs[PreferencesKeys.SHOW_CLOCK_SECONDS] = showSeconds
+        }
+    }
+
+    override suspend fun updateLayoutVisibility(
+        showClock: Boolean?,
+        showDate: Boolean?,
+        showSearchBar: Boolean?,
+        showAppGrid: Boolean?,
+        showDock: Boolean?,
+        showWaybar: Boolean?
+    ) {
+        dataStore.edit { prefs ->
+            showClock?.let { prefs[PreferencesKeys.SHOW_CLOCK] = it }
+            showDate?.let { prefs[PreferencesKeys.SHOW_DATE] = it }
+            showSearchBar?.let { prefs[PreferencesKeys.SHOW_SEARCH_BAR] = it }
+            showAppGrid?.let { prefs[PreferencesKeys.SHOW_APP_GRID] = it }
+            showDock?.let { prefs[PreferencesKeys.SHOW_DOCK] = it }
+            showWaybar?.let { prefs[PreferencesKeys.SHOW_WAYBAR] = it }
+        }
+    }
+
+    override suspend fun updateAppLabelVisibility(show: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[PreferencesKeys.SHOW_APP_LABELS] = show
+        }
+    }
+
+    override suspend fun updateWallpaperSettings(dim: Float, amoledMode: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[PreferencesKeys.WALLPAPER_DIM] = dim.coerceIn(0f, 1f)
+            prefs[PreferencesKeys.WALLPAPER_AMOLED] = amoledMode
+        }
+    }
+
+    override suspend fun updateDockPackages(packageNames: List<String>) {
+        dataStore.edit { prefs ->
+            prefs[PreferencesKeys.DOCK_PACKAGES] = packageNames.joinToString(",")
         }
     }
 }

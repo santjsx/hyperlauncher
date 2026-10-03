@@ -26,6 +26,7 @@ fun MainNavigation() {
                 HomeScreen(
                     uiState = uiState,
                     onWorkspaceSelected = viewModel::onWorkspaceSelected,
+                    onSearchQueryChange = viewModel::onSearchQueryChanged,
                     onAppClick = { pkg, act -> viewModel.launchApp(pkg, act) },
                     onSetDefaultLauncher = {
                         uiState.requestDefaultIntent?.let { intent ->

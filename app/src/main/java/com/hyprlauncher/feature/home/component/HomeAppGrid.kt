@@ -35,6 +35,13 @@ import androidx.compose.ui.unit.dp
 import com.hyprlauncher.core.designsystem.theme.HyprTheme
 import com.hyprlauncher.data.database.entity.AppEntity
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.unit.sp
+import com.hyprlauncher.domain.model.IconShape
+import com.hyprlauncher.domain.model.IconTint
+
 /**
  * Responsive Application Grid conforming to PRD Section 10 & Section 24.
  */
@@ -43,6 +50,12 @@ fun HomeAppGrid(
     apps: List<AppEntity>,
     columns: Int,
     showLabels: Boolean,
+    iconSizeDp: Int = 36,
+    horizontalSpacingDp: Int = 8,
+    verticalSpacingDp: Int = 8,
+    iconShape: IconShape = IconShape.SYSTEM_DEFAULT,
+    iconTint: IconTint = IconTint.NONE,
+    labelFontSizeSp: Int = 11,
     loadIcon: suspend (String) -> Bitmap?,
     onAppClick: (String, String?) -> Unit,
     modifier: Modifier = Modifier
@@ -69,13 +82,17 @@ fun HomeAppGrid(
         columns = GridCells.Fixed(safeColumns),
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(verticalSpacingDp.coerceIn(2, 24).dp),
+        horizontalArrangement = Arrangement.spacedBy(horizontalSpacingDp.coerceIn(2, 24).dp)
     ) {
         items(apps, key = { it.packageName }) { app ->
             AppGridTile(
                 app = app,
                 showLabel = showLabels,
+                iconSizeDp = iconSizeDp,
+                iconShape = iconShape,
+                iconTint = iconTint,
+                labelFontSizeSp = labelFontSizeSp,
                 loadIcon = loadIcon,
                 onClick = { onAppClick(app.packageName, app.activityName) }
             )
@@ -87,6 +104,10 @@ fun HomeAppGrid(
 private fun AppGridTile(
     app: AppEntity,
     showLabel: Boolean,
+    iconSizeDp: Int,
+    iconShape: IconShape,
+    iconTint: IconTint,
+    labelFontSizeSp: Int,
     loadIcon: suspend (String) -> Bitmap?,
     onClick: () -> Unit
 ) {
@@ -94,6 +115,19 @@ private fun AppGridTile(
 
     LaunchedEffect(app.packageName) {
         iconBitmap = loadIcon(app.packageName)
+    }
+
+    val shapeModifier = when (iconShape) {
+        IconShape.ROUNDED_SQUARE -> RoundedCornerShape(8.dp)
+        IconShape.CIRCLE -> CircleShape
+        IconShape.SQUIRCLE -> RoundedCornerShape(30)
+        IconShape.SYSTEM_DEFAULT -> RoundedCornerShape(8.dp)
+    }
+
+    val colorFilter = when (iconTint) {
+        IconTint.THEME_ACCENT -> ColorFilter.tint(HyprTheme.colors.accent)
+        IconTint.THEME_PRIMARY -> ColorFilter.tint(HyprTheme.colors.textPrimary)
+        IconTint.NONE -> null
     }
 
     Surface(
@@ -105,7 +139,7 @@ private fun AppGridTile(
         border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -114,12 +148,15 @@ private fun AppGridTile(
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = app.label,
-                    modifier = Modifier.size(36.dp)
+                    colorFilter = colorFilter,
+                    modifier = Modifier
+                        .size(iconSizeDp.dp)
+                        .clip(shapeModifier)
                 )
             } else {
                 Surface(
-                    modifier = Modifier.size(36.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.size(iconSizeDp.dp),
+                    shape = shapeModifier,
                     color = HyprTheme.colors.surfaceElevated,
                     border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border)
                 ) {
@@ -138,7 +175,7 @@ private fun AppGridTile(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = app.label,
-                    style = HyprTheme.typography.monospaceSmall,
+                    style = HyprTheme.typography.monospaceSmall.copy(fontSize = labelFontSizeSp.sp),
                     color = HyprTheme.colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

@@ -32,6 +32,12 @@ import androidx.compose.ui.unit.dp
 import com.hyprlauncher.core.designsystem.theme.HyprTheme
 import com.hyprlauncher.data.database.entity.AppEntity
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorFilter
+import com.hyprlauncher.domain.model.IconShape
+import com.hyprlauncher.domain.model.IconTint
+
 /**
  * Bottom Dock component conforming to PRD Section 11 & Section 24.
  * Hosts pinned or favorite applications in a sleek floating container.
@@ -39,7 +45,13 @@ import com.hyprlauncher.data.database.entity.AppEntity
 @Composable
 fun HomeDock(
     dockApps: List<AppEntity>,
-    showLabels: Boolean,
+    showLabels: Boolean = false,
+    iconSizeDp: Int = 40,
+    spacingDp: Int = 10,
+    cornerRadiusDp: Int = 16,
+    backgroundAlpha: Float = 0.95f,
+    iconTint: IconTint = IconTint.NONE,
+    iconShape: IconShape = IconShape.SYSTEM_DEFAULT,
     loadIcon: suspend (String) -> Bitmap?,
     onAppClick: (String, String?) -> Unit,
     modifier: Modifier = Modifier
@@ -48,21 +60,24 @@ fun HomeDock(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = HyprTheme.colors.surfaceElevated.copy(alpha = 0.95f),
+        shape = RoundedCornerShape(cornerRadiusDp.dp),
+        color = HyprTheme.colors.surfaceElevated.copy(alpha = backgroundAlpha.coerceIn(0f, 1f)),
         border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = spacingDp.dp, vertical = (spacingDp * 0.75f).toInt().coerceAtLeast(4).dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            dockApps.take(6).forEach { app ->
+            dockApps.take(7).forEach { app ->
                 DockItem(
                     app = app,
                     showLabel = showLabels,
+                    iconSizeDp = iconSizeDp,
+                    iconTint = iconTint,
+                    iconShape = iconShape,
                     loadIcon = loadIcon,
                     onClick = { onAppClick(app.packageName, app.activityName) }
                 )
@@ -75,6 +90,9 @@ fun HomeDock(
 private fun DockItem(
     app: AppEntity,
     showLabel: Boolean,
+    iconSizeDp: Int,
+    iconTint: IconTint,
+    iconShape: IconShape,
     loadIcon: suspend (String) -> Bitmap?,
     onClick: () -> Unit
 ) {
@@ -84,10 +102,23 @@ private fun DockItem(
         iconBitmap = loadIcon(app.packageName)
     }
 
+    val shapeModifier = when (iconShape) {
+        IconShape.ROUNDED_SQUARE -> RoundedCornerShape(8.dp)
+        IconShape.CIRCLE -> CircleShape
+        IconShape.SQUIRCLE -> RoundedCornerShape(32)
+        IconShape.SYSTEM_DEFAULT -> RoundedCornerShape(10.dp)
+    }
+
+    val colorFilter = when (iconTint) {
+        IconTint.THEME_ACCENT -> ColorFilter.tint(HyprTheme.colors.accent)
+        IconTint.THEME_PRIMARY -> ColorFilter.tint(HyprTheme.colors.textPrimary)
+        IconTint.NONE -> null
+    }
+
     Column(
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -96,12 +127,15 @@ private fun DockItem(
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = app.label,
-                modifier = Modifier.size(40.dp)
+                colorFilter = colorFilter,
+                modifier = Modifier
+                    .size(iconSizeDp.dp)
+                    .clip(shapeModifier)
             )
         } else {
             Surface(
-                modifier = Modifier.size(40.dp),
-                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.size(iconSizeDp.dp),
+                shape = shapeModifier,
                 color = HyprTheme.colors.surface,
                 border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border)
             ) {

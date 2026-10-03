@@ -39,6 +39,15 @@ fun MainNavigation() {
                     onSelectThemePreset = viewModel::selectTheme,
                     onSelectAnimationScale = viewModel::setAnimationScale,
                     onSelectCornerRadius = viewModel::setCornerRadius,
+                    onUpdateLayout = viewModel::updateLayoutConfig,
+                    onUpdateDock = viewModel::updateDockConfig,
+                    onUpdateGrid = viewModel::updateAppGridConfig,
+                    onUpdateSearch = viewModel::updateSearchConfig,
+                    onUpdateTypography = viewModel::updateTypographyConfig,
+                    onUpdateIcons = viewModel::updateIconConfig,
+                    onPinApp = viewModel::pinAppToDock,
+                    onUnpinApp = viewModel::unpinAppFromDock,
+                    onResetCustomizationDefaults = viewModel::resetCustomizationDefaults,
                     onAppClick = { pkg, act -> viewModel.launchApp(pkg, act) },
                     onSetDefaultLauncher = {
                         uiState.requestDefaultIntent?.let { intent ->

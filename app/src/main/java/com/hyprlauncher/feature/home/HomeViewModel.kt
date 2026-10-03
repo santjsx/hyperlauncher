@@ -16,8 +16,17 @@ import com.hyprlauncher.data.datastore.LauncherPreferencesRepository
 import com.hyprlauncher.data.repository.AppRepository
 import com.hyprlauncher.data.repository.ThemeRepository
 import com.hyprlauncher.data.repository.WorkspaceRepository
+import com.hyprlauncher.core.search.AppSearchEngine
+import com.hyprlauncher.data.repository.CustomizationRepository
 import com.hyprlauncher.domain.model.AnimationScale
+import com.hyprlauncher.domain.model.AppGridConfig
+import com.hyprlauncher.domain.model.CustomizationConfig
+import com.hyprlauncher.domain.model.DockConfig
+import com.hyprlauncher.domain.model.IconConfig
+import com.hyprlauncher.domain.model.LayoutConfig
+import com.hyprlauncher.domain.model.SearchConfig
 import com.hyprlauncher.domain.model.ThemeConfig
+import com.hyprlauncher.domain.model.TypographyConfig
 import com.hyprlauncher.domain.model.Workspace
 import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
@@ -37,6 +46,7 @@ data class HomeUiState(
     val workspaces: List<Workspace> = emptyList(),
     val activeWorkspace: Workspace? = null,
     val themeConfig: ThemeConfig = ThemeConfig(),
+    val customizationConfig: CustomizationConfig = CustomizationConfig(),
     val apps: List<AppEntity> = emptyList(),
     val dockApps: List<AppEntity> = emptyList(),
     val filteredApps: List<AppEntity> = emptyList(),
@@ -55,6 +65,8 @@ class HomeViewModel @Inject constructor(
     private val workspaceRepository: WorkspaceRepository,
     private val appRepository: AppRepository,
     private val themeRepository: ThemeRepository,
+    private val customizationRepository: CustomizationRepository,
+    private val appSearchEngine: AppSearchEngine,
     private val launchAppUseCase: LaunchAppUseCase,
     private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase,
     private val gestureRepository: GestureRepository,
@@ -65,6 +77,7 @@ class HomeViewModel @Inject constructor(
         val preferences: LauncherPreferences,
         val workspaces: List<Workspace>,
         val themeConfig: ThemeConfig,
+        val customizationConfig: CustomizationConfig,
         val apps: List<AppEntity>,
         val gestureBindings: Map<GestureType, LauncherAction>
     )
@@ -89,10 +102,13 @@ class HomeViewModel @Inject constructor(
         preferencesRepository.preferences,
         workspaceRepository.allWorkspaces,
         themeRepository.themeConfig,
-        appRepository.allApps,
-        gestureRepository.gestureBindings
-    ) { prefs, workspaces, themeConfig, apps, gestures ->
-        CoreData(prefs, workspaces, themeConfig, apps, gestures)
+        customizationRepository.customizationConfig,
+        combine(
+            appRepository.allApps,
+            gestureRepository.gestureBindings
+        ) { apps, gestures -> apps to gestures }
+    ) { prefs, workspaces, themeConfig, customizationConfig, (apps, gestures) ->
+        CoreData(prefs, workspaces, themeConfig, customizationConfig, apps, gestures)
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -103,6 +119,7 @@ class HomeViewModel @Inject constructor(
     ) { coreData, query, roleStatus, launchResult ->
         val apps = coreData.apps
         val prefs = coreData.preferences
+        val customization = coreData.customizationConfig
         val activeWs = coreData.workspaces.firstOrNull { it.id == prefs.activeWorkspaceId }
             ?: coreData.workspaces.firstOrNull()
 
@@ -115,15 +132,15 @@ class HomeViewModel @Inject constructor(
         }
 
         val filtered = if (query.isNotBlank()) {
-            workspaceApps.filter {
-                it.label.contains(query, ignoreCase = true) ||
-                it.packageName.contains(query, ignoreCase = true)
-            }
+            appSearchEngine.rankApps(query, workspaceApps, customization.search).map { it.app }
         } else {
             workspaceApps
         }
 
-        val dockApps = if (prefs.dockPackageNames.isNotEmpty()) {
+        val dockApps = if (customization.dock.pinnedPackages.isNotEmpty()) {
+            val appMap = apps.associateBy { it.packageName }
+            customization.dock.pinnedPackages.mapNotNull { appMap[it] }
+        } else if (prefs.dockPackageNames.isNotEmpty()) {
             val appMap = apps.associateBy { it.packageName }
             prefs.dockPackageNames.mapNotNull { appMap[it] }
         } else {
@@ -136,6 +153,7 @@ class HomeViewModel @Inject constructor(
             workspaces = coreData.workspaces,
             activeWorkspace = activeWs,
             themeConfig = coreData.themeConfig,
+            customizationConfig = customization,
             apps = apps,
             dockApps = dockApps,
             filteredApps = filtered,
@@ -329,6 +347,74 @@ class HomeViewModel @Inject constructor(
     fun setUseMonospaceAll(enable: Boolean) {
         viewModelScope.launch {
             themeRepository.updateUseMonospaceAll(enable)
+        }
+    }
+
+    fun updateLayoutConfig(config: LayoutConfig) {
+        viewModelScope.launch {
+            customizationRepository.updateLayoutConfig(config)
+            preferencesRepository.updateLayoutVisibility(
+                showClock = config.showClock,
+                showDate = config.showDate,
+                showSearchBar = config.showSearchBar,
+                showAppGrid = config.showAppGrid,
+                showDock = config.showDock,
+                showWaybar = config.showWaybar
+            )
+            preferencesRepository.updateWallpaperSettings(config.wallpaperDim, config.wallpaperAmoledMode)
+        }
+    }
+
+    fun updateDockConfig(config: DockConfig) {
+        viewModelScope.launch {
+            customizationRepository.updateDockConfig(config)
+            preferencesRepository.updateDockVisibility(config.enabled)
+        }
+    }
+
+    fun updateAppGridConfig(config: AppGridConfig) {
+        viewModelScope.launch {
+            customizationRepository.updateAppGridConfig(config)
+            preferencesRepository.updateGridLayout(config.columns, config.rows)
+            preferencesRepository.updateAppLabelVisibility(config.showLabels)
+        }
+    }
+
+    fun updateSearchConfig(config: SearchConfig) {
+        viewModelScope.launch {
+            customizationRepository.updateSearchConfig(config)
+        }
+    }
+
+    fun updateTypographyConfig(config: TypographyConfig) {
+        viewModelScope.launch {
+            customizationRepository.updateTypographyConfig(config)
+            themeRepository.updateFontScale(config.fontScale)
+        }
+    }
+
+    fun updateIconConfig(config: IconConfig) {
+        viewModelScope.launch {
+            customizationRepository.updateIconConfig(config)
+            preferencesRepository.updateAppLabelVisibility(config.showAppLabels)
+        }
+    }
+
+    fun pinAppToDock(packageName: String) {
+        viewModelScope.launch {
+            customizationRepository.pinAppToDock(packageName)
+        }
+    }
+
+    fun unpinAppFromDock(packageName: String) {
+        viewModelScope.launch {
+            customizationRepository.unpinAppFromDock(packageName)
+        }
+    }
+
+    fun resetCustomizationDefaults() {
+        viewModelScope.launch {
+            customizationRepository.resetToDefaults()
         }
     }
 }

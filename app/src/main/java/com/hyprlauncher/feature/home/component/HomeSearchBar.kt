@@ -32,6 +32,7 @@ import com.hyprlauncher.core.designsystem.theme.HyprTheme
 fun HomeSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
+    placeholderText: String = "Search apps or run command (rofi)...",
     onSearchSubmit: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -59,7 +60,7 @@ fun HomeSearchBar(
             Box(modifier = Modifier.weight(1f)) {
                 if (query.isEmpty()) {
                     Text(
-                        text = "Search apps or run command (rofi)...",
+                        text = placeholderText,
                         style = HyprTheme.typography.bodyMedium,
                         color = HyprTheme.colors.textSecondary
                     )

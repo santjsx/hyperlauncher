@@ -63,4 +63,38 @@ class AppSearchEngineTest {
         // Camera is favorite (+500 score), so should be first
         assertEquals("com.android.camera", results.first().app.packageName)
     }
+
+    @Test
+    fun fuzzyMatchDisabledReturnsNoMatchForTypos() {
+        val disabledConfig = com.hyprlauncher.domain.model.SearchConfig(fuzzyMatchingEnabled = false)
+        val results = searchEngine.rankApps("firefoz", sampleApps, disabledConfig)
+        assertTrue(results.none { it.app.packageName == "org.mozilla.firefox" })
+    }
+
+    @Test
+    fun frequencyFirstRankingOrdersByLaunchCount() {
+        val freqConfig = com.hyprlauncher.domain.model.SearchConfig(
+            rankingMode = com.hyprlauncher.domain.model.SearchRankingMode.FREQUENCY_FIRST
+        )
+        val results = searchEngine.rankApps("", sampleApps, freqConfig)
+        // YouTube has 50 launches (highest)
+        assertEquals("com.google.android.youtube", results.first().app.packageName)
+    }
+
+    @Test
+    fun alphabeticalRankingOrdersByName() {
+        val alphaConfig = com.hyprlauncher.domain.model.SearchConfig(
+            rankingMode = com.hyprlauncher.domain.model.SearchRankingMode.ALPHABETICAL
+        )
+        val results = searchEngine.rankApps("", sampleApps, alphaConfig)
+        // Calculator starts with 'C' (comes first alphabetically among Calculator, Camera, Firefox, Spotify, YouTube)
+        assertEquals("Calculator", results.first().app.label)
+    }
+
+    @Test
+    fun packageNameMatchEnabledMatchesOnPackageQuery() {
+        val packageConfig = com.hyprlauncher.domain.model.SearchConfig(showPackageNames = true)
+        val results = searchEngine.rankApps("mozilla", sampleApps, packageConfig)
+        assertTrue(results.any { it.app.packageName == "org.mozilla.firefox" })
+    }
 }

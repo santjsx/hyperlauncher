@@ -1,6 +1,8 @@
 package com.hyprlauncher.core.search
 
 import com.hyprlauncher.data.database.entity.AppEntity
+import com.hyprlauncher.domain.model.SearchConfig
+import com.hyprlauncher.domain.model.SearchRankingMode
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -24,22 +26,33 @@ enum class MatchType {
 }
 
 interface AppSearchEngine {
-    fun rankApps(query: String, apps: List<AppEntity>): List<SearchMatchResult>
+    fun rankApps(query: String, apps: List<AppEntity>): List<SearchMatchResult> = rankApps(query, apps, SearchConfig())
+    fun rankApps(query: String, apps: List<AppEntity>, config: SearchConfig): List<SearchMatchResult>
 }
 
 @Singleton
 class DefaultAppSearchEngine @Inject constructor() : AppSearchEngine {
 
     override fun rankApps(query: String, apps: List<AppEntity>): List<SearchMatchResult> {
+        return rankApps(query, apps, SearchConfig())
+    }
+
+    override fun rankApps(query: String, apps: List<AppEntity>, config: SearchConfig): List<SearchMatchResult> {
         val trimmed = query.trim().lowercase()
         if (trimmed.isEmpty()) {
-            return apps.map { app ->
+            val baseList = apps.map { app ->
                 SearchMatchResult(
                     app = app,
                     score = calculateDefaultScore(app),
                     matchType = MatchType.NONE
                 )
-            }.sortedByDescending { it.score }
+            }
+            return when (config.rankingMode) {
+                SearchRankingMode.FREQUENCY_FIRST -> baseList.sortedWith(compareByDescending<SearchMatchResult> { it.app.launchCount }.thenBy { it.app.label.lowercase() })
+                SearchRankingMode.RECENCY_FIRST -> baseList.sortedWith(compareByDescending<SearchMatchResult> { it.app.lastUsedTimestamp }.thenBy { it.app.label.lowercase() })
+                SearchRankingMode.ALPHABETICAL -> baseList.sortedBy { it.app.label.lowercase() }
+                SearchRankingMode.DETERMINISTIC_HYBRID -> baseList.sortedByDescending { it.score }
+            }
         }
 
         val results = mutableListOf<SearchMatchResult>()
@@ -54,10 +67,10 @@ class DefaultAppSearchEngine @Inject constructor() : AppSearchEngine {
                 labelLower == trimmed -> 1000 to MatchType.EXACT
 
                 // 2. Prefix Match
-                labelLower.startsWith(trimmed) -> 800 to MatchType.PREFIX
+                config.prefixMatchingEnabled && labelLower.startsWith(trimmed) -> 800 to MatchType.PREFIX
 
                 // 3. Word Prefix Match (e.g. "play" matches "Google Play Store")
-                isWordPrefix(labelLower, trimmed) -> 700 to MatchType.WORD_PREFIX
+                config.prefixMatchingEnabled && isWordPrefix(labelLower, trimmed) -> 700 to MatchType.WORD_PREFIX
 
                 // 4. Acronym Match (e.g. "yt" matches "YouTube", "gpm" matches "Google Play Music")
                 isAcronymMatch(app.label, trimmed) -> 600 to MatchType.ACRONYM
@@ -69,10 +82,10 @@ class DefaultAppSearchEngine @Inject constructor() : AppSearchEngine {
                 }
 
                 // 6. Fuzzy Match (Levenshtein distance <= 2 for queries of length >= 3)
-                trimmed.length >= 3 && isFuzzyMatch(labelLower, trimmed) -> 350 to MatchType.FUZZY
+                config.fuzzyMatchingEnabled && trimmed.length >= 3 && isFuzzyMatch(labelLower, trimmed) -> 350 to MatchType.FUZZY
 
                 // 7. Package Name Match
-                packageLower.contains(trimmed) -> 200 to MatchType.PACKAGE_NAME
+                config.showPackageNames && packageLower.contains(trimmed) -> 200 to MatchType.PACKAGE_NAME
 
                 else -> 0 to MatchType.NONE
             }
@@ -95,10 +108,26 @@ class DefaultAppSearchEngine @Inject constructor() : AppSearchEngine {
             }
         }
 
-        return results.sortedWith(
-            compareByDescending<SearchMatchResult> { it.score }
-                .thenBy { it.app.label.lowercase() }
-        )
+        return when (config.rankingMode) {
+            SearchRankingMode.FREQUENCY_FIRST -> results.sortedWith(
+                compareByDescending<SearchMatchResult> { it.app.launchCount }
+                    .thenByDescending { it.score }
+                    .thenBy { it.app.label.lowercase() }
+            )
+            SearchRankingMode.RECENCY_FIRST -> results.sortedWith(
+                compareByDescending<SearchMatchResult> { it.app.lastUsedTimestamp }
+                    .thenByDescending { it.score }
+                    .thenBy { it.app.label.lowercase() }
+            )
+            SearchRankingMode.ALPHABETICAL -> results.sortedWith(
+                compareBy<SearchMatchResult> { it.app.label.lowercase() }
+                    .thenByDescending { it.score }
+            )
+            SearchRankingMode.DETERMINISTIC_HYBRID -> results.sortedWith(
+                compareByDescending<SearchMatchResult> { it.score }
+                    .thenBy { it.app.label.lowercase() }
+            )
+        }
     }
 
     private fun calculateDefaultScore(app: AppEntity): Int {

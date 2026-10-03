@@ -27,7 +27,21 @@ import com.hyprlauncher.data.repository.DefaultThemeRepository
 import com.hyprlauncher.data.repository.DefaultWorkspaceRepository
 import com.hyprlauncher.data.repository.ThemeRepository
 import com.hyprlauncher.data.repository.WorkspaceRepository
+import com.hyprlauncher.core.search.DefaultAppSearchEngine
+import com.hyprlauncher.data.repository.CustomizationRepository
+import com.hyprlauncher.data.repository.DefaultCustomizationRepository
 import com.hyprlauncher.domain.model.AnimationScale
+import com.hyprlauncher.domain.model.AppGridConfig
+import com.hyprlauncher.domain.model.CustomizationConfig
+import com.hyprlauncher.domain.model.DockConfig
+import com.hyprlauncher.domain.model.FontFamilyPreference
+import com.hyprlauncher.domain.model.IconConfig
+import com.hyprlauncher.domain.model.IconShape
+import com.hyprlauncher.domain.model.IconTint
+import com.hyprlauncher.domain.model.LayoutConfig
+import com.hyprlauncher.domain.model.SearchConfig
+import com.hyprlauncher.domain.model.SearchRankingMode
+import com.hyprlauncher.domain.model.TypographyConfig
 import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
 import com.hyprlauncher.domain.usecase.DiscoverAndIndexAppsUseCase
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
@@ -43,6 +57,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -119,11 +134,20 @@ class HomeViewModelTest {
         appDao.upsertApp(AppEntity(packageName = "com.android.settings", activityName = "SettingsActivity", label = "Settings"))
         appDao.upsertApp(AppEntity(packageName = "com.termux", activityName = "TermuxActivity", label = "Terminal"))
 
+        val customizationDataStore = PreferenceDataStoreFactory.create(
+            scope = testScope,
+            produceFile = { tmpFolder.newFile("vm_test_customization.preferences_pb") }
+        )
+        val customizationRepository = DefaultCustomizationRepository(customizationDataStore)
+        val searchEngine = DefaultAppSearchEngine()
+
         viewModel = HomeViewModel(
             preferencesRepository = preferencesRepository,
             workspaceRepository = workspaceRepository,
             appRepository = appRepository,
             themeRepository = themeRepository,
+            customizationRepository = customizationRepository,
+            appSearchEngine = searchEngine,
             gestureRepository = gestureRepository,
             gestureActionExecutor = gestureActionExecutor,
             launchAppUseCase = launchAppUseCase,
@@ -318,5 +342,58 @@ class HomeViewModelTest {
         }
         assertEquals(AnimationScale.REDUCED, updated.themeConfig.animationScale)
         assertEquals(16, updated.themeConfig.cornerRadiusDp)
+    }
+
+    @Test
+    fun updateCustomizationConfigsReflectedInUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+
+        // Test Layout config
+        viewModel.updateLayoutConfig(LayoutConfig(showWaybar = false, wallpaperDim = 0.5f))
+        val layoutState = viewModel.uiState.first { !it.customizationConfig.layout.showWaybar }
+        assertEquals(0.5f, layoutState.customizationConfig.layout.wallpaperDim, 0.01f)
+
+        // Test Dock config
+        viewModel.updateDockConfig(DockConfig(iconSizeDp = 48, showLabels = true))
+        val dockState = viewModel.uiState.first { it.customizationConfig.dock.iconSizeDp == 48 }
+        assertTrue(dockState.customizationConfig.dock.showLabels)
+
+        // Test AppGrid config
+        viewModel.updateAppGridConfig(AppGridConfig(columns = 5, rows = 6, iconSizeDp = 42))
+        val gridState = viewModel.uiState.first { it.customizationConfig.grid.columns == 5 }
+        assertEquals(6, gridState.customizationConfig.grid.rows)
+        assertEquals(42, gridState.customizationConfig.grid.iconSizeDp)
+
+        // Test Search config
+        viewModel.updateSearchConfig(SearchConfig(rankingMode = SearchRankingMode.FREQUENCY_FIRST))
+        val searchState = viewModel.uiState.first { it.customizationConfig.search.rankingMode == SearchRankingMode.FREQUENCY_FIRST }
+        assertEquals(SearchRankingMode.FREQUENCY_FIRST, searchState.customizationConfig.search.rankingMode)
+
+        // Test Typography config
+        viewModel.updateTypographyConfig(TypographyConfig(fontFamily = FontFamilyPreference.MONOSPACE, fontScale = 1.15f))
+        val typeState = viewModel.uiState.first { it.customizationConfig.typography.fontFamily == FontFamilyPreference.MONOSPACE }
+        assertEquals(1.15f, typeState.customizationConfig.typography.fontScale, 0.01f)
+
+        // Test Icon config
+        viewModel.updateIconConfig(IconConfig(shape = IconShape.SQUIRCLE, tint = IconTint.THEME_ACCENT))
+        val iconState = viewModel.uiState.first { it.customizationConfig.icons.shape == IconShape.SQUIRCLE }
+        assertEquals(IconTint.THEME_ACCENT, iconState.customizationConfig.icons.tint)
+    }
+
+    @Test
+    fun pinAndUnpinAppUpdatesDockAppsInUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+
+        viewModel.pinAppToDock("com.termux")
+        val pinnedState = viewModel.uiState.first {
+            it.customizationConfig.dock.pinnedPackages.contains("com.termux")
+        }
+        assertTrue(pinnedState.dockApps.any { it.packageName == "com.termux" })
+
+        viewModel.unpinAppFromDock("com.termux")
+        val unpinnedState = viewModel.uiState.first {
+            !it.customizationConfig.dock.pinnedPackages.contains("com.termux")
+        }
+        assertFalse(unpinnedState.customizationConfig.dock.pinnedPackages.contains("com.termux"))
     }
 }

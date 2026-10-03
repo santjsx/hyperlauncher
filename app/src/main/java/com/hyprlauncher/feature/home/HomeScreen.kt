@@ -49,13 +49,21 @@ import com.hyprlauncher.feature.home.component.WorkspaceManagementDialog
 import androidx.compose.animation.core.snap
 import com.hyprlauncher.core.designsystem.theme.ThemePresetId
 import com.hyprlauncher.domain.model.AnimationScale
+import com.hyprlauncher.domain.model.AppGridConfig
+import com.hyprlauncher.domain.model.CustomizationConfig
+import com.hyprlauncher.domain.model.DockConfig
+import com.hyprlauncher.domain.model.IconConfig
+import com.hyprlauncher.domain.model.LayoutConfig
+import com.hyprlauncher.domain.model.SearchConfig
+import com.hyprlauncher.domain.model.TypographyConfig
+import com.hyprlauncher.feature.home.component.CustomizationDialog
 import com.hyprlauncher.feature.home.component.ThemePickerDialog
 
 /**
  * HyprLauncher Home Screen conforming to PRD Phase 3 (Sections 8, 9, 10, 11, 24, 27),
- * Phase 5 Gesture recognition, Phase 6 Workspace Engine, and Phase 7 Theme Engine.
+ * Phase 5 Gesture recognition, Phase 6 Workspace Engine, Phase 7 Theme Engine, and Phase 8 Customization.
  * Implements a declarative layout engine orchestrating the Waybar, Clock, Search bar, App grid, Dock, Gestures,
- * Hyprland-inspired animated workspace transitions, and live theming.
+ * Hyprland-inspired animated workspace transitions, live theming, and full system ricing customization.
  */
 @Composable
 fun HomeScreen(
@@ -70,6 +78,15 @@ fun HomeScreen(
     onSelectThemePreset: (ThemePresetId) -> Unit = {},
     onSelectAnimationScale: (AnimationScale) -> Unit = {},
     onSelectCornerRadius: (Int) -> Unit = {},
+    onUpdateLayout: (LayoutConfig) -> Unit = {},
+    onUpdateDock: (DockConfig) -> Unit = {},
+    onUpdateGrid: (AppGridConfig) -> Unit = {},
+    onUpdateSearch: (SearchConfig) -> Unit = {},
+    onUpdateTypography: (TypographyConfig) -> Unit = {},
+    onUpdateIcons: (IconConfig) -> Unit = {},
+    onPinApp: (String) -> Unit = {},
+    onUnpinApp: (String) -> Unit = {},
+    onResetCustomizationDefaults: () -> Unit = {},
     onAppClick: (String, String?) -> Unit,
     onSetDefaultLauncher: () -> Unit,
     loadIcon: suspend (String) -> Bitmap? = { null },
@@ -77,14 +94,17 @@ fun HomeScreen(
 ) {
     var showWorkspaceManager by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
+    var showCustomizationDialog by remember { mutableStateOf(false) }
 
     val activeWallpaperUri = uiState.activeWorkspace?.wallpaperUri
         ?: uiState.activeWorkspace?.layoutConfig?.wallpaperUri
     val activeDimLevel = uiState.activeWorkspace?.layoutConfig?.wallpaperDim
-        ?: uiState.preferences.wallpaperDim
+        ?: uiState.customizationConfig.layout.wallpaperDim
+    val amoledMode = uiState.customizationConfig.layout.wallpaperAmoledMode
+        || uiState.preferences.wallpaperAmoledMode
 
     HomeWallpaperSurface(
-        amoledMode = uiState.preferences.wallpaperAmoledMode,
+        amoledMode = amoledMode,
         dimLevel = activeDimLevel,
         wallpaperUri = activeWallpaperUri,
         modifier = modifier
@@ -100,13 +120,15 @@ fun HomeScreen(
         ) {
             // Header: Waybar status bar + Optional default launcher banner
             Column {
-                if (uiState.preferences.showWaybar) {
+                val showWaybar = uiState.customizationConfig.layout.showWaybar && uiState.preferences.showWaybar
+                if (showWaybar) {
                     WaybarTopBar(
                         workspaces = uiState.workspaces,
                         activeWorkspaceId = uiState.preferences.activeWorkspaceId,
                         onWorkspaceSelected = onWorkspaceSelected,
                         onOpenWorkspaceManager = { showWorkspaceManager = true },
                         onOpenThemePicker = { showThemePicker = true },
+                        onOpenCustomization = { showCustomizationDialog = true },
                         onOpenDrawer = onOpenDrawer,
                         performanceModeName = uiState.preferences.performanceMode.name
                     )
@@ -126,25 +148,27 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Clock & Date component
-                val showClock = uiState.activeWorkspace?.layoutConfig?.showClock
-                    ?: uiState.preferences.showClock
+                val showClock = uiState.customizationConfig.layout.showClock
+                    && (uiState.activeWorkspace?.layoutConfig?.showClock ?: uiState.preferences.showClock)
                 if (showClock) {
                     Spacer(modifier = Modifier.height(10.dp))
                     HomeClock(
                         clock24Hour = uiState.preferences.clock24Hour,
                         showSeconds = uiState.preferences.showClockSeconds,
-                        showDate = uiState.preferences.showDate
+                        showDate = uiState.customizationConfig.layout.showDate && uiState.preferences.showDate
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                 }
 
                 // Interactive Rofi / Search bar
-                val showSearchBar = uiState.activeWorkspace?.layoutConfig?.showSearchBar
-                    ?: uiState.preferences.showSearchBar
+                val searchConf = uiState.customizationConfig.search
+                val showSearchBar = uiState.customizationConfig.layout.showSearchBar
+                    && (uiState.activeWorkspace?.layoutConfig?.showSearchBar ?: uiState.preferences.showSearchBar)
                 if (showSearchBar) {
                     HomeSearchBar(
                         query = uiState.searchQuery,
                         onQueryChange = onSearchQueryChange,
+                        placeholderText = searchConf.placeholderText,
                         onSearchSubmit = {
                             val firstMatch = uiState.filteredApps.firstOrNull()
                             if (firstMatch != null) {
@@ -156,9 +180,12 @@ fun HomeScreen(
                 }
 
                 // App Grid with Hyprland Horizontal Workspace Transition (Configurable timing via PRD §29)
-                if (uiState.preferences.showAppGrid) {
+                val showAppGrid = uiState.customizationConfig.layout.showAppGrid && uiState.preferences.showAppGrid
+                if (showAppGrid) {
+                    val gridConf = uiState.customizationConfig.grid
+                    val iconsConf = uiState.customizationConfig.icons
                     val effectiveColumns = uiState.activeWorkspace?.layoutConfig?.gridColumns
-                        ?: uiState.preferences.gridColumns
+                        ?: gridConf.columns
 
                     val animScale = uiState.themeConfig.animationScale
                     val duration = (180 * animScale.multiplier).toInt()
@@ -188,7 +215,13 @@ fun HomeScreen(
                         HomeAppGrid(
                             apps = uiState.filteredApps,
                             columns = effectiveColumns,
-                            showLabels = uiState.preferences.showAppLabels,
+                            showLabels = gridConf.showLabels && iconsConf.showAppLabels,
+                            iconSizeDp = gridConf.iconSizeDp,
+                            horizontalSpacingDp = gridConf.spacingHorizontalDp,
+                            verticalSpacingDp = gridConf.spacingVerticalDp,
+                            iconShape = iconsConf.shape,
+                            iconTint = iconsConf.tint,
+                            labelFontSizeSp = gridConf.labelFontSizeSp,
                             loadIcon = loadIcon,
                             onAppClick = onAppClick,
                             modifier = Modifier.fillMaxWidth()
@@ -202,10 +235,21 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (uiState.preferences.showDock && uiState.dockApps.isNotEmpty()) {
+                val dockConf = uiState.customizationConfig.dock
+                val iconsConf = uiState.customizationConfig.icons
+                val showDock = dockConf.enabled
+                    && uiState.customizationConfig.layout.showDock
+                    && uiState.preferences.showDock
+                if (showDock && uiState.dockApps.isNotEmpty()) {
                     HomeDock(
                         dockApps = uiState.dockApps,
-                        showLabels = false,
+                        showLabels = dockConf.showLabels && iconsConf.showAppLabels,
+                        iconSizeDp = dockConf.iconSizeDp,
+                        spacingDp = dockConf.spacingDp,
+                        cornerRadiusDp = dockConf.cornerRadiusDp,
+                        backgroundAlpha = dockConf.backgroundAlpha,
+                        iconTint = iconsConf.tint,
+                        iconShape = iconsConf.shape,
                         loadIcon = loadIcon,
                         onAppClick = onAppClick
                     )
@@ -266,6 +310,23 @@ fun HomeScreen(
             onDismiss = { showThemePicker = false }
         )
     }
+
+    if (showCustomizationDialog) {
+        CustomizationDialog(
+            config = uiState.customizationConfig,
+            installedApps = uiState.apps,
+            onUpdateLayout = onUpdateLayout,
+            onUpdateDock = onUpdateDock,
+            onUpdateGrid = onUpdateGrid,
+            onUpdateSearch = onUpdateSearch,
+            onUpdateTypography = onUpdateTypography,
+            onUpdateIcons = onUpdateIcons,
+            onPinApp = onPinApp,
+            onUnpinApp = onUnpinApp,
+            onResetDefaults = onResetCustomizationDefaults,
+            onDismiss = { showCustomizationDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -305,6 +366,7 @@ private fun WaybarTopBar(
     onWorkspaceSelected: (Int) -> Unit,
     onOpenWorkspaceManager: () -> Unit,
     onOpenThemePicker: () -> Unit,
+    onOpenCustomization: () -> Unit,
     onOpenDrawer: () -> Unit,
     performanceModeName: String
 ) {
@@ -361,7 +423,7 @@ private fun WaybarTopBar(
             }
         }
 
-        // Status indicator modules + Rofi drawer button + Theme picker button
+        // Status indicator modules + Rofi drawer button + Theme picker button + Rice customization button
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -376,6 +438,20 @@ private fun WaybarTopBar(
                     text = "theme",
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.accentSecondary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = HyprTheme.colors.surfaceElevated,
+                border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.terminalGreen),
+                modifier = Modifier.clickable { onOpenCustomization() }
+            ) {
+                Text(
+                    text = "rice",
+                    style = HyprTheme.typography.statusModule,
+                    color = HyprTheme.colors.terminalGreen,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     fontWeight = FontWeight.Bold
                 )

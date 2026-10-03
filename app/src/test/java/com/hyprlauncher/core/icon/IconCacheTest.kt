@@ -75,4 +75,18 @@ class IconCacheTest {
         val result = iconCache.getIcon("com.completely.nonexistent.app")
         assertNull(result)
     }
+
+    @Test
+    fun trimMemoryPurgesMemoryCacheOnCriticalPressure() = runTest {
+        val icon = iconCache.getIcon(testPackageName)
+        assertNotNull(icon)
+        val statsWithCache = iconCache.getStats()
+        org.junit.Assert.assertTrue(statsWithCache.memorySizeBytes > 0)
+
+        // Simulate critical memory pressure
+        iconCache.trimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
+
+        val statsAfterTrim = iconCache.getStats()
+        assertEquals(0, statsAfterTrim.memorySizeBytes)
+    }
 }

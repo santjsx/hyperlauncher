@@ -1,5 +1,6 @@
 package com.hyprlauncher.core.icon
 
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -33,6 +34,7 @@ interface IconCache {
     suspend fun getIcon(packageName: String, activityName: String? = null): Bitmap?
     suspend fun invalidate(packageName: String)
     suspend fun clear()
+    fun trimMemory(level: Int) {}
     fun getStats(): CacheStats
 }
 
@@ -129,6 +131,24 @@ class DefaultIconCache @Inject constructor(
             diskCacheDir.mkdirs()
         }
         Unit
+    }
+
+    override fun trimMemory(level: Int) {
+        synchronized(memoryCache) {
+            when {
+                level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE ||
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
+                    memoryCache.evictAll()
+                }
+                level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE ||
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> {
+                    memoryCache.trimToSize(memoryCache.maxSize() / 2)
+                }
+                level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> {
+                    memoryCache.trimToSize(memoryCache.maxSize() * 3 / 4)
+                }
+            }
+        }
     }
 
     override fun getStats(): CacheStats {

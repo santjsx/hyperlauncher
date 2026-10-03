@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.hyprlauncher.core.designsystem.theme.ThemePresetId
 import com.hyprlauncher.core.gesture.DefaultGestureActionExecutor
 import com.hyprlauncher.core.gesture.DefaultGestureRepository
 import com.hyprlauncher.core.gesture.GestureActionExecutor
@@ -22,8 +23,11 @@ import com.hyprlauncher.data.datastore.DefaultLauncherPreferencesRepository
 import com.hyprlauncher.data.datastore.LauncherPreferencesRepository
 import com.hyprlauncher.data.repository.AppRepository
 import com.hyprlauncher.data.repository.DefaultAppRepository
+import com.hyprlauncher.data.repository.DefaultThemeRepository
 import com.hyprlauncher.data.repository.DefaultWorkspaceRepository
+import com.hyprlauncher.data.repository.ThemeRepository
 import com.hyprlauncher.data.repository.WorkspaceRepository
+import com.hyprlauncher.domain.model.AnimationScale
 import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
 import com.hyprlauncher.domain.usecase.DiscoverAndIndexAppsUseCase
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
@@ -63,6 +67,7 @@ class HomeViewModelTest {
     private lateinit var database: HyprDatabase
     private lateinit var appDao: AppDao
     private lateinit var workspaceRepository: WorkspaceRepository
+    private lateinit var themeRepository: ThemeRepository
     private lateinit var preferencesRepository: LauncherPreferencesRepository
     private lateinit var gestureRepository: GestureRepository
     private lateinit var gestureActionExecutor: GestureActionExecutor
@@ -83,6 +88,12 @@ class HomeViewModelTest {
             produceFile = { tmpFolder.newFile("vm_test_prefs.preferences_pb") }
         )
         preferencesRepository = DefaultLauncherPreferencesRepository(dataStore)
+
+        val themeDataStore = PreferenceDataStoreFactory.create(
+            scope = testScope,
+            produceFile = { tmpFolder.newFile("vm_test_theme.preferences_pb") }
+        )
+        themeRepository = DefaultThemeRepository(themeDataStore)
 
         val gestureDataStore = PreferenceDataStoreFactory.create(
             scope = testScope,
@@ -112,6 +123,7 @@ class HomeViewModelTest {
             preferencesRepository = preferencesRepository,
             workspaceRepository = workspaceRepository,
             appRepository = appRepository,
+            themeRepository = themeRepository,
             gestureRepository = gestureRepository,
             gestureActionExecutor = gestureActionExecutor,
             launchAppUseCase = launchAppUseCase,
@@ -282,5 +294,29 @@ class HomeViewModelTest {
         val packages = state.filteredApps.map { it.packageName }.toSet()
         assertTrue(packages.contains("com.termux"))
         assertTrue(packages.contains("org.mozilla.firefox"))
+    }
+
+    @Test
+    fun selectThemeUpdatesThemeConfigInUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        val initial = viewModel.uiState.first { it.themeConfig.presetId == ThemePresetId.ARCH_DARK }
+        assertEquals(ThemePresetId.ARCH_DARK, initial.themeConfig.presetId)
+
+        viewModel.selectTheme(ThemePresetId.TOKYO_NIGHT)
+        val updated = viewModel.uiState.first { it.themeConfig.presetId == ThemePresetId.TOKYO_NIGHT }
+        assertEquals(ThemePresetId.TOKYO_NIGHT, updated.themeConfig.presetId)
+    }
+
+    @Test
+    fun setAnimationScaleAndCornerRadiusUpdateUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.setAnimationScale(AnimationScale.REDUCED)
+        viewModel.setCornerRadius(16)
+
+        val updated = viewModel.uiState.first {
+            it.themeConfig.animationScale == AnimationScale.REDUCED && it.themeConfig.cornerRadiusDp == 16
+        }
+        assertEquals(AnimationScale.REDUCED, updated.themeConfig.animationScale)
+        assertEquals(16, updated.themeConfig.cornerRadiusDp)
     }
 }

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hyprlauncher.core.designsystem.theme.ThemePresetId
 import com.hyprlauncher.core.gesture.GestureActionExecutor
 import com.hyprlauncher.core.gesture.GestureRepository
 import com.hyprlauncher.core.gesture.GestureType
@@ -13,7 +14,10 @@ import com.hyprlauncher.data.database.entity.AppEntity
 import com.hyprlauncher.data.datastore.LauncherPreferences
 import com.hyprlauncher.data.datastore.LauncherPreferencesRepository
 import com.hyprlauncher.data.repository.AppRepository
+import com.hyprlauncher.data.repository.ThemeRepository
 import com.hyprlauncher.data.repository.WorkspaceRepository
+import com.hyprlauncher.domain.model.AnimationScale
+import com.hyprlauncher.domain.model.ThemeConfig
 import com.hyprlauncher.domain.model.Workspace
 import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
@@ -32,6 +36,7 @@ data class HomeUiState(
     val preferences: LauncherPreferences = LauncherPreferences(),
     val workspaces: List<Workspace> = emptyList(),
     val activeWorkspace: Workspace? = null,
+    val themeConfig: ThemeConfig = ThemeConfig(),
     val apps: List<AppEntity> = emptyList(),
     val dockApps: List<AppEntity> = emptyList(),
     val filteredApps: List<AppEntity> = emptyList(),
@@ -49,6 +54,7 @@ class HomeViewModel @Inject constructor(
     private val preferencesRepository: LauncherPreferencesRepository,
     private val workspaceRepository: WorkspaceRepository,
     private val appRepository: AppRepository,
+    private val themeRepository: ThemeRepository,
     private val launchAppUseCase: LaunchAppUseCase,
     private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase,
     private val gestureRepository: GestureRepository,
@@ -58,6 +64,7 @@ class HomeViewModel @Inject constructor(
     private data class CoreData(
         val preferences: LauncherPreferences,
         val workspaces: List<Workspace>,
+        val themeConfig: ThemeConfig,
         val apps: List<AppEntity>,
         val gestureBindings: Map<GestureType, LauncherAction>
     )
@@ -81,10 +88,11 @@ class HomeViewModel @Inject constructor(
     private val coreDataFlow = combine(
         preferencesRepository.preferences,
         workspaceRepository.allWorkspaces,
+        themeRepository.themeConfig,
         appRepository.allApps,
         gestureRepository.gestureBindings
-    ) { prefs, workspaces, apps, gestures ->
-        CoreData(prefs, workspaces, apps, gestures)
+    ) { prefs, workspaces, themeConfig, apps, gestures ->
+        CoreData(prefs, workspaces, themeConfig, apps, gestures)
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -127,6 +135,7 @@ class HomeViewModel @Inject constructor(
             preferences = prefs,
             workspaces = coreData.workspaces,
             activeWorkspace = activeWs,
+            themeConfig = coreData.themeConfig,
             apps = apps,
             dockApps = dockApps,
             filteredApps = filtered,
@@ -290,6 +299,36 @@ class HomeViewModel @Inject constructor(
                 )
                 workspaceRepository.updateWorkspaceLayout(workspaceId, updatedConfig)
             }
+        }
+    }
+
+    fun selectTheme(presetId: ThemePresetId) {
+        viewModelScope.launch {
+            themeRepository.selectPreset(presetId)
+        }
+    }
+
+    fun setAnimationScale(scale: AnimationScale) {
+        viewModelScope.launch {
+            themeRepository.updateAnimationScale(scale)
+        }
+    }
+
+    fun setCornerRadius(radiusDp: Int) {
+        viewModelScope.launch {
+            themeRepository.updateCornerRadius(radiusDp)
+        }
+    }
+
+    fun setFontScale(scale: Float) {
+        viewModelScope.launch {
+            themeRepository.updateFontScale(scale)
+        }
+    }
+
+    fun setUseMonospaceAll(enable: Boolean) {
+        viewModelScope.launch {
+            themeRepository.updateUseMonospaceAll(enable)
         }
     }
 }

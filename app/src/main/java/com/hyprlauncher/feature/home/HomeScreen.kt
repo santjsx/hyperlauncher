@@ -46,11 +46,16 @@ import com.hyprlauncher.feature.home.component.HomeSearchBar
 import com.hyprlauncher.feature.home.component.HomeWallpaperSurface
 import com.hyprlauncher.feature.home.component.WorkspaceManagementDialog
 
+import androidx.compose.animation.core.snap
+import com.hyprlauncher.core.designsystem.theme.ThemePresetId
+import com.hyprlauncher.domain.model.AnimationScale
+import com.hyprlauncher.feature.home.component.ThemePickerDialog
+
 /**
  * HyprLauncher Home Screen conforming to PRD Phase 3 (Sections 8, 9, 10, 11, 24, 27),
- * Phase 5 Gesture recognition, and Phase 6 Workspace Engine.
+ * Phase 5 Gesture recognition, Phase 6 Workspace Engine, and Phase 7 Theme Engine.
  * Implements a declarative layout engine orchestrating the Waybar, Clock, Search bar, App grid, Dock, Gestures,
- * and Hyprland-inspired animated workspace transitions.
+ * Hyprland-inspired animated workspace transitions, and live theming.
  */
 @Composable
 fun HomeScreen(
@@ -62,12 +67,16 @@ fun HomeScreen(
     onCreateWorkspace: (String) -> Unit = {},
     onRenameWorkspace: (Int, String) -> Unit = { _, _ -> },
     onDeleteWorkspace: (Int) -> Unit = {},
+    onSelectThemePreset: (ThemePresetId) -> Unit = {},
+    onSelectAnimationScale: (AnimationScale) -> Unit = {},
+    onSelectCornerRadius: (Int) -> Unit = {},
     onAppClick: (String, String?) -> Unit,
     onSetDefaultLauncher: () -> Unit,
     loadIcon: suspend (String) -> Bitmap? = { null },
     modifier: Modifier = Modifier
 ) {
     var showWorkspaceManager by remember { mutableStateOf(false) }
+    var showThemePicker by remember { mutableStateOf(false) }
 
     val activeWallpaperUri = uiState.activeWorkspace?.wallpaperUri
         ?: uiState.activeWorkspace?.layoutConfig?.wallpaperUri
@@ -97,6 +106,7 @@ fun HomeScreen(
                         activeWorkspaceId = uiState.preferences.activeWorkspaceId,
                         onWorkspaceSelected = onWorkspaceSelected,
                         onOpenWorkspaceManager = { showWorkspaceManager = true },
+                        onOpenThemePicker = { showThemePicker = true },
                         onOpenDrawer = onOpenDrawer,
                         performanceModeName = uiState.preferences.performanceMode.name
                     )
@@ -145,21 +155,31 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // App Grid with Hyprland Horizontal Workspace Transition (180ms, PRD Section 18 & 26)
+                // App Grid with Hyprland Horizontal Workspace Transition (Configurable timing via PRD §29)
                 if (uiState.preferences.showAppGrid) {
                     val effectiveColumns = uiState.activeWorkspace?.layoutConfig?.gridColumns
                         ?: uiState.preferences.gridColumns
 
+                    val animScale = uiState.themeConfig.animationScale
+                    val duration = (180 * animScale.multiplier).toInt()
+
                     AnimatedContent(
                         targetState = uiState.preferences.activeWorkspaceId,
                         transitionSpec = {
-                            val isForward = targetState > initialState
-                            if (isForward) {
-                                (slideInHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it } + fadeIn(animationSpec = tween(180)))
-                                    .togetherWith(slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(animationSpec = tween(180)))
+                            if (animScale == AnimationScale.DISABLED) {
+                                (fadeIn(animationSpec = snap()))
+                                    .togetherWith(fadeOut(animationSpec = snap()))
                             } else {
-                                (slideInHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it } + fadeIn(animationSpec = tween(180)))
-                                    .togetherWith(slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it } + fadeOut(animationSpec = tween(180)))
+                                val isForward = targetState > initialState
+                                val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(duration, easing = FastOutSlowInEasing)
+                                val fadeSpec = tween<Float>(duration)
+                                if (isForward) {
+                                    (slideInHorizontally(animationSpec = slideSpec) { it } + fadeIn(animationSpec = fadeSpec))
+                                        .togetherWith(slideOutHorizontally(animationSpec = slideSpec) { -it } + fadeOut(animationSpec = fadeSpec))
+                                } else {
+                                    (slideInHorizontally(animationSpec = slideSpec) { -it } + fadeIn(animationSpec = fadeSpec))
+                                        .togetherWith(slideOutHorizontally(animationSpec = slideSpec) { it } + fadeOut(animationSpec = fadeSpec))
+                                }
                             }
                         },
                         label = "WorkspaceGridTransition",
@@ -236,6 +256,16 @@ fun HomeScreen(
             onDismiss = { showWorkspaceManager = false }
         )
     }
+
+    if (showThemePicker) {
+        ThemePickerDialog(
+            themeConfig = uiState.themeConfig,
+            onSelectPreset = onSelectThemePreset,
+            onSelectAnimationScale = onSelectAnimationScale,
+            onSelectCornerRadius = onSelectCornerRadius,
+            onDismiss = { showThemePicker = false }
+        )
+    }
 }
 
 @Composable
@@ -274,6 +304,7 @@ private fun WaybarTopBar(
     activeWorkspaceId: Int,
     onWorkspaceSelected: (Int) -> Unit,
     onOpenWorkspaceManager: () -> Unit,
+    onOpenThemePicker: () -> Unit,
     onOpenDrawer: () -> Unit,
     performanceModeName: String
 ) {
@@ -330,11 +361,25 @@ private fun WaybarTopBar(
             }
         }
 
-        // Status indicator modules + Rofi drawer button
+        // Status indicator modules + Rofi drawer button + Theme picker button
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = HyprTheme.colors.surfaceElevated,
+                border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accentSecondary),
+                modifier = Modifier.clickable { onOpenThemePicker() }
+            ) {
+                Text(
+                    text = "theme",
+                    style = HyprTheme.typography.statusModule,
+                    color = HyprTheme.colors.accentSecondary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Surface(
                 shape = RoundedCornerShape(4.dp),
                 color = HyprTheme.colors.surfaceElevated,

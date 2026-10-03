@@ -36,6 +36,9 @@ fun MainNavigation() {
                     onCreateWorkspace = viewModel::createWorkspace,
                     onRenameWorkspace = viewModel::renameWorkspace,
                     onDeleteWorkspace = viewModel::deleteWorkspace,
+                    onSelectThemePreset = viewModel::selectTheme,
+                    onSelectAnimationScale = viewModel::setAnimationScale,
+                    onSelectCornerRadius = viewModel::setCornerRadius,
                     onAppClick = { pkg, act -> viewModel.launchApp(pkg, act) },
                     onSetDefaultLauncher = {
                         uiState.requestDefaultIntent?.let { intent ->

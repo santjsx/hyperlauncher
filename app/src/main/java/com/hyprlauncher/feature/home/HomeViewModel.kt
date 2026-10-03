@@ -1,16 +1,16 @@
 package com.hyprlauncher.feature.home
 
 import android.content.Intent
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hyprlauncher.core.platform.LaunchResult
-import com.hyprlauncher.data.database.dao.AppDao
 import com.hyprlauncher.data.database.dao.WorkspaceDao
 import com.hyprlauncher.data.database.entity.AppEntity
 import com.hyprlauncher.data.database.entity.WorkspaceEntity
 import com.hyprlauncher.data.datastore.LauncherPreferences
 import com.hyprlauncher.data.datastore.LauncherPreferencesRepository
-import com.hyprlauncher.domain.usecase.DiscoverAndIndexAppsUseCase
+import com.hyprlauncher.data.repository.AppRepository
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
 import com.hyprlauncher.domain.usecase.LaunchAppUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,8 +37,7 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val preferencesRepository: LauncherPreferencesRepository,
     private val workspaceDao: WorkspaceDao,
-    private val appDao: AppDao,
-    private val discoverAndIndexAppsUseCase: DiscoverAndIndexAppsUseCase,
+    private val appRepository: AppRepository,
     private val launchAppUseCase: LaunchAppUseCase,
     private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase
 ) : ViewModel() {
@@ -61,16 +60,16 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        // Perform initial application discovery & indexing
+        // Perform initial application discovery & indexing via AppRepository
         viewModelScope.launch {
-            discoverAndIndexAppsUseCase()
+            appRepository.syncAllApps()
         }
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
         preferencesRepository.preferences,
         workspaceDao.getAllWorkspaces(),
-        appDao.getAllVisibleApps(),
+        appRepository.allApps,
         roleStatusFlow,
         lastLaunchResult
     ) { prefs, workspaces, apps, roleStatus, launchResult ->
@@ -99,6 +98,10 @@ class HomeViewModel @Inject constructor(
     fun launchApp(packageName: String, activityName: String? = null) {
         val result = launchAppUseCase(packageName, activityName)
         lastLaunchResult.value = result
+    }
+
+    suspend fun getAppIcon(packageName: String): Bitmap? {
+        return appRepository.getAppIcon(packageName)
     }
 
     fun refreshRoleStatus() {

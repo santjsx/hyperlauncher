@@ -31,7 +31,8 @@ fun MainNavigation() {
                         uiState.requestDefaultIntent?.let { intent ->
                             runCatching { context.startActivity(intent) }
                         }
-                    }
+                    },
+                    loadIcon = { pkg -> viewModel.getAppIcon(pkg) }
                 )
             }
         }

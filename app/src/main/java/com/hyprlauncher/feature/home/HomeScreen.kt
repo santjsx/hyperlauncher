@@ -1,9 +1,12 @@
 package com.hyprlauncher.feature.home
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +56,7 @@ fun HomeScreen(
     onWorkspaceSelected: (Int) -> Unit,
     onAppClick: (String, String?) -> Unit,
     onSetDefaultLauncher: () -> Unit,
+    loadIcon: suspend (String) -> Bitmap? = { null },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -176,6 +180,7 @@ fun HomeScreen(
                         items(quickApps, key = { it.packageName }) { app ->
                             AppGridItem(
                                 app = app,
+                                loadIcon = loadIcon,
                                 onClick = { onAppClick(app.packageName, app.activityName) }
                             )
                         }
@@ -234,8 +239,15 @@ fun HomeScreen(
 @Composable
 private fun AppGridItem(
     app: AppEntity,
+    loadIcon: suspend (String) -> Bitmap?,
     onClick: () -> Unit
 ) {
+    var iconBitmap by remember(app.packageName) { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(app.packageName) {
+        iconBitmap = loadIcon(app.packageName)
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -249,20 +261,29 @@ private fun AppGridItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // First letter badge with monospace styling
-            Surface(
-                modifier = Modifier.size(32.dp),
-                shape = RoundedCornerShape(6.dp),
-                color = HyprTheme.colors.surfaceElevated,
-                border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = app.label.firstOrNull()?.uppercase() ?: "?",
-                        style = HyprTheme.typography.statusModule,
-                        color = HyprTheme.colors.accent,
-                        fontWeight = FontWeight.Bold
-                    )
+            val bitmap = iconBitmap
+            if (bitmap != null && !bitmap.isRecycled) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = app.label,
+                    modifier = Modifier.size(32.dp)
+                )
+            } else {
+                // Monospace monogram badge
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = RoundedCornerShape(6.dp),
+                    color = HyprTheme.colors.surfaceElevated,
+                    border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = app.label.firstOrNull()?.uppercase() ?: "?",
+                            style = HyprTheme.typography.statusModule,
+                            color = HyprTheme.colors.accent,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 

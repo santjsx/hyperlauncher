@@ -31,6 +31,10 @@ fun MainNavigation() {
                     uiState = uiState,
                     onWorkspaceSelected = viewModel::onWorkspaceSelected,
                     onSearchQueryChange = viewModel::onSearchQueryChanged,
+                    widgetHostManager = viewModel.widgetHostManager,
+                    onPlaceWidget = viewModel::placeWidget,
+                    onResizeWidget = viewModel::resizeWidget,
+                    onRemoveWidget = viewModel::removeWidget,
                     onOpenDrawer = { backStack.add(DrawerKey) },
                     onOpenRiceStudio = { backStack.add(RiceStudioKey) },
                     onGesture = { gesture ->

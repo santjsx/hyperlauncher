@@ -58,18 +58,27 @@ import com.hyprlauncher.domain.model.SearchConfig
 import com.hyprlauncher.domain.model.TypographyConfig
 import com.hyprlauncher.feature.home.component.CustomizationDialog
 import com.hyprlauncher.feature.home.component.ThemePickerDialog
+import com.hyprlauncher.core.widget.WidgetHostManager
+import com.hyprlauncher.domain.model.WidgetProviderItem
+import com.hyprlauncher.feature.widget.WidgetHostContainer
+import com.hyprlauncher.feature.widget.WidgetPickerDialog
 
 /**
  * HyprLauncher Home Screen conforming to PRD Phase 3 (Sections 8, 9, 10, 11, 24, 27),
- * Phase 5 Gesture recognition, Phase 6 Workspace Engine, Phase 7 Theme Engine, and Phase 8 Customization.
+ * Phase 5 Gesture recognition, Phase 6 Workspace Engine, Phase 7 Theme Engine, Phase 8 Customization,
+ * and Phase 10 Production Widget System.
  * Implements a declarative layout engine orchestrating the Waybar, Clock, Search bar, App grid, Dock, Gestures,
- * Hyprland-inspired animated workspace transitions, live theming, and full system ricing customization.
+ * Widgets with crash isolation, Hyprland-inspired animated workspace transitions, live theming, and full system ricing.
  */
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
     onWorkspaceSelected: (Int) -> Unit,
     onSearchQueryChange: (String) -> Unit,
+    widgetHostManager: WidgetHostManager? = null,
+    onPlaceWidget: (WidgetProviderItem) -> Unit = {},
+    onResizeWidget: (widgetId: String, spanX: Int, spanY: Int) -> Unit = { _, _, _ -> },
+    onRemoveWidget: (widgetId: String) -> Unit = {},
     onOpenDrawer: () -> Unit = {},
     onOpenRiceStudio: () -> Unit = {},
     onGesture: (GestureType) -> Unit = {},
@@ -96,6 +105,7 @@ fun HomeScreen(
     var showWorkspaceManager by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showCustomizationDialog by remember { mutableStateOf(false) }
+    var showWidgetPicker by remember { mutableStateOf(false) }
 
     val activeWallpaperUri = uiState.activeWorkspace?.wallpaperUri
         ?: uiState.activeWorkspace?.layoutConfig?.wallpaperUri
@@ -131,6 +141,7 @@ fun HomeScreen(
                         onOpenThemePicker = { showThemePicker = true },
                         onOpenCustomization = { showCustomizationDialog = true },
                         onOpenRiceStudio = onOpenRiceStudio,
+                        onOpenWidgetPicker = { showWidgetPicker = true },
                         onOpenDrawer = onOpenDrawer,
                         performanceModeName = uiState.preferences.performanceMode.name
                     )
@@ -142,7 +153,7 @@ fun HomeScreen(
                 }
             }
 
-            // Center / Main Content Area: Clock + Search Prompt + App Grid
+            // Center / Main Content Area: Clock + Search Prompt + Active Widgets + App Grid
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -179,6 +190,29 @@ fun HomeScreen(
                         }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // Widgets Canvas for Active Workspace (PRD Section 25)
+                if (uiState.widgets.isNotEmpty() && widgetHostManager != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        uiState.widgets.forEach { widget ->
+                            WidgetHostContainer(
+                                widget = widget,
+                                widgetHostManager = widgetHostManager,
+                                onResize = { spanX, spanY -> onResizeWidget(widget.id, spanX, spanY) },
+                                onRemove = { onRemoveWidget(widget.id) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height((widget.spanY * 60 + 16).coerceIn(72, 320).dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
 
                 // App Grid with Hyprland Horizontal Workspace Transition (Configurable timing via PRD §29)
@@ -330,6 +364,17 @@ fun HomeScreen(
             onDismiss = { showCustomizationDialog = false }
         )
     }
+
+    if (showWidgetPicker) {
+        WidgetPickerDialog(
+            providers = uiState.availableWidgetProviders,
+            onSelectProvider = { provider ->
+                onPlaceWidget(provider)
+                showWidgetPicker = false
+            },
+            onDismiss = { showWidgetPicker = false }
+        )
+    }
 }
 
 @Composable
@@ -371,6 +416,7 @@ private fun WaybarTopBar(
     onOpenThemePicker: () -> Unit,
     onOpenCustomization: () -> Unit,
     onOpenRiceStudio: () -> Unit,
+    onOpenWidgetPicker: () -> Unit,
     onOpenDrawer: () -> Unit,
     performanceModeName: String
 ) {
@@ -427,7 +473,7 @@ private fun WaybarTopBar(
             }
         }
 
-        // Status indicator modules + Rofi drawer button + Theme picker button + Rice customization button
+        // Status indicator modules + Rofi drawer button + Theme picker button + Rice customization button + Widget button
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -470,6 +516,20 @@ private fun WaybarTopBar(
                     text = "studio",
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.accent,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = HyprTheme.colors.surfaceElevated,
+                border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accentSecondary),
+                modifier = Modifier.clickable { onOpenWidgetPicker() }
+            ) {
+                Text(
+                    text = "widget",
+                    style = HyprTheme.typography.statusModule,
+                    color = HyprTheme.colors.accentSecondary,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     fontWeight = FontWeight.Bold
                 )

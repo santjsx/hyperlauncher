@@ -43,6 +43,13 @@ import com.hyprlauncher.domain.model.SearchConfig
 import com.hyprlauncher.domain.model.SearchRankingMode
 import com.hyprlauncher.domain.model.TypographyConfig
 import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
+import android.appwidget.AppWidgetHostView
+import android.appwidget.AppWidgetProviderInfo
+import android.content.ComponentName
+import com.hyprlauncher.core.widget.WidgetHostManager
+import com.hyprlauncher.data.repository.DefaultWidgetRepository
+import com.hyprlauncher.data.repository.WidgetRepository
+import com.hyprlauncher.domain.model.WidgetProviderItem
 import com.hyprlauncher.domain.usecase.DiscoverAndIndexAppsUseCase
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
 import com.hyprlauncher.domain.usecase.LaunchAppUseCase
@@ -87,7 +94,50 @@ class HomeViewModelTest {
     private lateinit var preferencesRepository: LauncherPreferencesRepository
     private lateinit var gestureRepository: GestureRepository
     private lateinit var gestureActionExecutor: GestureActionExecutor
+    private lateinit var widgetRepository: WidgetRepository
+    private lateinit var fakeWidgetHostManager: FakeWidgetHostManager
     private lateinit var viewModel: HomeViewModel
+
+    class FakeWidgetHostManager : WidgetHostManager {
+        var isListening = false
+        private var nextId = 100
+        val deletedIds = mutableListOf<Int>()
+        val boundComponents = mutableMapOf<Int, ComponentName>()
+        var providers = listOf(
+            WidgetProviderItem(
+                providerPackage = "com.hyprlauncher.weather",
+                providerClass = "com.hyprlauncher.weather.WeatherWidget",
+                appLabel = "Weather",
+                widgetLabel = "Live Weather",
+                minWidthDp = 140,
+                minHeightDp = 70,
+                minSpanX = 2,
+                minSpanY = 1
+            ),
+            WidgetProviderItem(
+                providerPackage = "com.hyprlauncher.clock",
+                providerClass = "com.hyprlauncher.clock.AnalogClockWidget",
+                appLabel = "Clock",
+                widgetLabel = "Analog Clock",
+                minWidthDp = 140,
+                minHeightDp = 140,
+                minSpanX = 2,
+                minSpanY = 2
+            )
+        )
+
+        override fun startListening() { isListening = true }
+        override fun stopListening() { isListening = false }
+        override fun allocateAppWidgetId(): Int = nextId++
+        override fun deleteAppWidgetId(appWidgetId: Int) { deletedIds.add(appWidgetId) }
+        override fun getAvailableProviders(): List<WidgetProviderItem> = providers
+        override fun getAppWidgetInfo(appWidgetId: Int): AppWidgetProviderInfo? = null
+        override fun createView(context: Context, appWidgetId: Int, info: AppWidgetProviderInfo): AppWidgetHostView? = null
+        override fun bindAppWidgetIdIfAllowed(appWidgetId: Int, provider: ComponentName): Boolean {
+            boundComponents[appWidgetId] = provider
+            return true
+        }
+    }
 
     @Before
     fun setup() = runBlocking(testDispatcher) {
@@ -116,6 +166,9 @@ class HomeViewModelTest {
             produceFile = { tmpFolder.newFile("vm_test_gestures.preferences_pb") }
         )
         gestureRepository = DefaultGestureRepository(gestureDataStore)
+
+        fakeWidgetHostManager = FakeWidgetHostManager()
+        widgetRepository = DefaultWidgetRepository(database.widgetDao(), fakeWidgetHostManager)
 
         val iconCache = DefaultIconCache(context, testDispatcher)
         val discoveryManager = DefaultPackageDiscoveryManager(context, testDispatcher)
@@ -151,16 +204,18 @@ class HomeViewModelTest {
             appSearchEngine = searchEngine,
             gestureRepository = gestureRepository,
             gestureActionExecutor = gestureActionExecutor,
+            widgetRepository = widgetRepository,
+            widgetHostManager = fakeWidgetHostManager,
             launchAppUseCase = launchAppUseCase,
             getLauncherRoleStatusUseCase = getRoleStatusUseCase
         )
     }
 
     @After
-    @Throws(IOException::class)
     fun tearDown() {
-        database.close()
-        Dispatchers.resetMain()
+        if (::database.isInitialized) {
+            runCatching { database.close() }
+        }
     }
 
     @Test
@@ -396,5 +451,87 @@ class HomeViewModelTest {
             !it.customizationConfig.dock.pinnedPackages.contains("com.termux")
         }
         assertFalse(unpinnedState.customizationConfig.dock.pinnedPackages.contains("com.termux"))
+    }
+
+    @Test
+    fun placeWidgetAllocatesAndPersistsWidgetInActiveWorkspace() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() }
+
+        val provider = fakeWidgetHostManager.providers.first()
+        viewModel.placeWidget(provider = provider, cellX = 0, cellY = 0)
+
+        val state = viewModel.uiState.first { it.widgets.isNotEmpty() }
+        assertEquals(1, state.widgets.size)
+        val placed = state.widgets.first()
+        assertEquals(1, placed.workspaceId)
+        assertEquals("com.hyprlauncher.weather", placed.providerPackage)
+        assertEquals(2, placed.spanX)
+        assertEquals(1, placed.spanY)
+        assertEquals(100, placed.appWidgetId)
+        assertTrue(fakeWidgetHostManager.boundComponents.containsKey(100))
+    }
+
+    @Test
+    fun resizeWidgetUpdatesDimensionsInUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() }
+
+        val provider = fakeWidgetHostManager.providers.first()
+        viewModel.placeWidget(provider = provider, cellX = 0, cellY = 0)
+        val initial = viewModel.uiState.first { it.widgets.isNotEmpty() }
+        val widgetId = initial.widgets.first().id
+
+        viewModel.resizeWidget(widgetId, spanX = 4, spanY = 3)
+        val updated = viewModel.uiState.first { it.widgets.any { w -> w.spanX == 4 && w.spanY == 3 } }
+        val resized = updated.widgets.first { it.id == widgetId }
+        assertEquals(4, resized.spanX)
+        assertEquals(3, resized.spanY)
+    }
+
+    @Test
+    fun removeWidgetDeletesWidgetAndCleansUpHostId() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() }
+
+        val provider = fakeWidgetHostManager.providers.first()
+        viewModel.placeWidget(provider = provider, cellX = 0, cellY = 0)
+        val initial = viewModel.uiState.first { it.widgets.isNotEmpty() }
+        val widget = initial.widgets.first()
+
+        viewModel.removeWidget(widget.id)
+        val updated = viewModel.uiState.first { it.widgets.isEmpty() }
+        assertEquals(0, updated.widgets.size)
+        assertTrue(fakeWidgetHostManager.deletedIds.contains(widget.appWidgetId))
+    }
+
+    @Test
+    fun switchingWorkspacesFiltersWidgetsToActiveWorkspaceOnly() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.workspaces.isNotEmpty() }
+
+        // Place widget in workspace 1
+        val provider1 = fakeWidgetHostManager.providers[0]
+        viewModel.placeWidget(provider = provider1, cellX = 0, cellY = 0)
+        val ws1State = viewModel.uiState.first { it.widgets.size == 1 }
+        assertEquals(1, ws1State.widgets.first().workspaceId)
+
+        // Switch to workspace 2
+        viewModel.onWorkspaceSelected(2)
+        val ws2EmptyState = viewModel.uiState.first { it.preferences.activeWorkspaceId == 2 && it.widgets.isEmpty() }
+        assertEquals(0, ws2EmptyState.widgets.size)
+
+        // Place widget in workspace 2
+        val provider2 = fakeWidgetHostManager.providers[1]
+        viewModel.placeWidget(provider = provider2, cellX = 1, cellY = 1)
+        val ws2State = viewModel.uiState.first { it.preferences.activeWorkspaceId == 2 && it.widgets.size == 1 }
+        assertEquals(2, ws2State.widgets.first().workspaceId)
+        assertEquals("com.hyprlauncher.clock", ws2State.widgets.first().providerPackage)
+
+        // Switch back to workspace 1
+        viewModel.onWorkspaceSelected(1)
+        val ws1ReturnState = viewModel.uiState.first { it.preferences.activeWorkspaceId == 1 && it.widgets.size == 1 }
+        assertEquals(1, ws1ReturnState.widgets.first().workspaceId)
+        assertEquals("com.hyprlauncher.weather", ws1ReturnState.widgets.first().providerPackage)
     }
 }

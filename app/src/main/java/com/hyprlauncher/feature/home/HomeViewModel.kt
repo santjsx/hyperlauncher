@@ -31,6 +31,11 @@ import com.hyprlauncher.domain.model.Workspace
 import com.hyprlauncher.domain.model.WorkspaceLayoutConfig
 import com.hyprlauncher.domain.usecase.GetLauncherRoleStatusUseCase
 import com.hyprlauncher.domain.usecase.LaunchAppUseCase
+import android.content.ComponentName
+import com.hyprlauncher.core.widget.WidgetHostManager
+import com.hyprlauncher.data.repository.WidgetRepository
+import com.hyprlauncher.domain.model.LauncherWidget
+import com.hyprlauncher.domain.model.WidgetProviderItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -50,6 +55,8 @@ data class HomeUiState(
     val apps: List<AppEntity> = emptyList(),
     val dockApps: List<AppEntity> = emptyList(),
     val filteredApps: List<AppEntity> = emptyList(),
+    val widgets: List<LauncherWidget> = emptyList(),
+    val availableWidgetProviders: List<WidgetProviderItem> = emptyList(),
     val gestureBindings: Map<GestureType, LauncherAction> = emptyMap(),
     val searchQuery: String = "",
     val totalAppsIndexed: Int = 0,
@@ -70,7 +77,9 @@ class HomeViewModel @Inject constructor(
     private val launchAppUseCase: LaunchAppUseCase,
     private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase,
     private val gestureRepository: GestureRepository,
-    private val gestureActionExecutor: GestureActionExecutor
+    private val gestureActionExecutor: GestureActionExecutor,
+    private val widgetRepository: WidgetRepository,
+    val widgetHostManager: WidgetHostManager
 ) : ViewModel() {
 
     private data class CoreData(
@@ -79,7 +88,8 @@ class HomeViewModel @Inject constructor(
         val themeConfig: ThemeConfig,
         val customizationConfig: CustomizationConfig,
         val apps: List<AppEntity>,
-        val gestureBindings: Map<GestureType, LauncherAction>
+        val gestureBindings: Map<GestureType, LauncherAction>,
+        val widgets: List<LauncherWidget>
     )
 
     private val roleStatusFlow = MutableStateFlow(getLauncherRoleStatusUseCase())
@@ -87,6 +97,9 @@ class HomeViewModel @Inject constructor(
     private val searchQueryFlow = MutableStateFlow("")
 
     init {
+        // Start listening to widget host updates (PRD Section 25)
+        widgetHostManager.startListening()
+
         // Seed default workspaces if none exist (PRD Section 17)
         viewModelScope.launch {
             workspaceRepository.ensureDefaultWorkspaces()
@@ -98,6 +111,11 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        widgetHostManager.stopListening()
+    }
+
     private val coreDataFlow = combine(
         preferencesRepository.preferences,
         workspaceRepository.allWorkspaces,
@@ -105,10 +123,11 @@ class HomeViewModel @Inject constructor(
         customizationRepository.customizationConfig,
         combine(
             appRepository.allApps,
-            gestureRepository.gestureBindings
-        ) { apps, gestures -> apps to gestures }
-    ) { prefs, workspaces, themeConfig, customizationConfig, (apps, gestures) ->
-        CoreData(prefs, workspaces, themeConfig, customizationConfig, apps, gestures)
+            gestureRepository.gestureBindings,
+            widgetRepository.allWidgets
+        ) { apps, gestures, widgets -> Triple(apps, gestures, widgets) }
+    ) { prefs, workspaces, themeConfig, customizationConfig, (apps, gestures, widgets) ->
+        CoreData(prefs, workspaces, themeConfig, customizationConfig, apps, gestures, widgets)
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -148,6 +167,12 @@ class HomeViewModel @Inject constructor(
             apps.take(5)
         }
 
+        val activeWorkspaceWidgets = if (activeWs != null) {
+            coreData.widgets.filter { it.workspaceId == activeWs.id }
+        } else {
+            coreData.widgets
+        }
+
         HomeUiState(
             preferences = prefs,
             workspaces = coreData.workspaces,
@@ -157,6 +182,8 @@ class HomeViewModel @Inject constructor(
             apps = apps,
             dockApps = dockApps,
             filteredApps = filtered,
+            widgets = activeWorkspaceWidgets,
+            availableWidgetProviders = widgetRepository.getAvailableWidgetProviders(),
             gestureBindings = coreData.gestureBindings,
             searchQuery = query,
             totalAppsIndexed = apps.size,
@@ -416,5 +443,55 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             customizationRepository.resetToDefaults()
         }
+    }
+
+    fun placeWidget(
+        provider: WidgetProviderItem,
+        cellX: Int = 0,
+        cellY: Int = 0,
+        spanX: Int = provider.minSpanX,
+        spanY: Int = provider.minSpanY
+    ) {
+        viewModelScope.launch {
+            val activeWsId = uiState.value.preferences.activeWorkspaceId
+            val appWidgetId = widgetHostManager.allocateAppWidgetId()
+            if (appWidgetId != -1) {
+                val component = ComponentName(provider.providerPackage, provider.providerClass)
+                widgetHostManager.bindAppWidgetIdIfAllowed(appWidgetId, component)
+                widgetRepository.placeWidget(
+                    workspaceId = activeWsId,
+                    appWidgetId = appWidgetId,
+                    providerPackage = provider.providerPackage,
+                    providerClass = provider.providerClass,
+                    cellX = cellX,
+                    cellY = cellY,
+                    spanX = spanX,
+                    spanY = spanY,
+                    label = provider.widgetLabel
+                )
+            }
+        }
+    }
+
+    fun resizeWidget(widgetId: String, spanX: Int, spanY: Int) {
+        viewModelScope.launch {
+            widgetRepository.resizeWidget(widgetId, spanX, spanY)
+        }
+    }
+
+    fun moveWidget(widgetId: String, cellX: Int, cellY: Int) {
+        viewModelScope.launch {
+            widgetRepository.moveWidget(widgetId, cellX, cellY)
+        }
+    }
+
+    fun removeWidget(widgetId: String) {
+        viewModelScope.launch {
+            widgetRepository.removeWidget(widgetId)
+        }
+    }
+
+    fun getAvailableWidgetProviders(): List<WidgetProviderItem> {
+        return widgetRepository.getAvailableWidgetProviders()
     }
 }

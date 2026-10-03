@@ -44,4 +44,9 @@ object DatabaseModule {
     fun provideRiceDao(database: HyprDatabase): RiceDao {
         return database.riceDao()
     }
+
+    @Provides
+    fun provideWidgetDao(database: HyprDatabase): com.hyprlauncher.data.database.dao.WidgetDao {
+        return database.widgetDao()
+    }
 }

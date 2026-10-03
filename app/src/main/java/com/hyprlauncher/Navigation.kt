@@ -8,6 +8,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.hyprlauncher.feature.drawer.DrawerScreen
+import com.hyprlauncher.feature.drawer.DrawerViewModel
 import com.hyprlauncher.feature.home.HomeScreen
 import com.hyprlauncher.feature.home.HomeViewModel
 
@@ -27,6 +29,7 @@ fun MainNavigation() {
                     uiState = uiState,
                     onWorkspaceSelected = viewModel::onWorkspaceSelected,
                     onSearchQueryChange = viewModel::onSearchQueryChanged,
+                    onOpenDrawer = { backStack.add(DrawerKey) },
                     onAppClick = { pkg, act -> viewModel.launchApp(pkg, act) },
                     onSetDefaultLauncher = {
                         uiState.requestDefaultIntent?.let { intent ->
@@ -34,6 +37,22 @@ fun MainNavigation() {
                         }
                     },
                     loadIcon = { pkg -> viewModel.getAppIcon(pkg) }
+                )
+            }
+            entry<DrawerKey> {
+                val drawerViewModel: DrawerViewModel = hiltViewModel()
+                val drawerState by drawerViewModel.uiState.collectAsStateWithLifecycle()
+                DrawerScreen(
+                    uiState = drawerState,
+                    onSearchQueryChange = drawerViewModel::onSearchQueryChanged,
+                    onSelectTab = drawerViewModel::onSelectTab,
+                    onAppClick = { pkg, act ->
+                        drawerViewModel.launchApp(pkg, act)
+                        backStack.removeLastOrNull()
+                    },
+                    onToggleFavorite = drawerViewModel::toggleFavorite,
+                    onDismiss = { backStack.removeLastOrNull() },
+                    loadIcon = { pkg -> drawerViewModel.getAppIcon(pkg) }
                 )
             }
         }

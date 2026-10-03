@@ -51,6 +51,12 @@ data class HyprTypography(
         fontSize = 15.sp,
         letterSpacing = 0.5.sp
     ),
+    val monospaceMedium: TextStyle = TextStyle(
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        letterSpacing = 0.4.sp
+    ),
     val monospaceSmall: TextStyle = TextStyle(
         fontFamily = FontFamily.Monospace,
         fontWeight = FontWeight.Normal,

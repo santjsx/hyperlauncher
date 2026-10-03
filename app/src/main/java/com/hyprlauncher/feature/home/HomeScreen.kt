@@ -40,6 +40,7 @@ fun HomeScreen(
     uiState: HomeUiState,
     onWorkspaceSelected: (Int) -> Unit,
     onSearchQueryChange: (String) -> Unit,
+    onOpenDrawer: () -> Unit = {},
     onAppClick: (String, String?) -> Unit,
     onSetDefaultLauncher: () -> Unit,
     loadIcon: suspend (String) -> Bitmap? = { null },
@@ -64,6 +65,7 @@ fun HomeScreen(
                         workspaces = uiState.workspaces,
                         activeWorkspaceId = uiState.preferences.activeWorkspaceId,
                         onWorkspaceSelected = onWorkspaceSelected,
+                        onOpenDrawer = onOpenDrawer,
                         performanceModeName = uiState.preferences.performanceMode.name
                     )
                 }
@@ -204,6 +206,7 @@ private fun WaybarTopBar(
     workspaces: List<WorkspaceEntity>,
     activeWorkspaceId: Int,
     onWorkspaceSelected: (Int) -> Unit,
+    onOpenDrawer: () -> Unit,
     performanceModeName: String
 ) {
     Row(
@@ -245,11 +248,25 @@ private fun WaybarTopBar(
             }
         }
 
-        // Status indicator modules
+        // Status indicator modules + Rofi drawer button
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = HyprTheme.colors.surfaceElevated,
+                border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accent),
+                modifier = Modifier.clickable { onOpenDrawer() }
+            ) {
+                Text(
+                    text = "rofi",
+                    style = HyprTheme.typography.statusModule,
+                    color = HyprTheme.colors.accent,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
             HyprStatusBadge(
                 text = "arch",
                 accentColor = HyprTheme.colors.accent

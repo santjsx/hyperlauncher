@@ -82,7 +82,7 @@ fun HomeAppGrid(
     LazyVerticalGrid(
         columns = GridCells.Fixed(safeColumns),
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(verticalSpacingDp.coerceIn(2, 24).dp),
         horizontalArrangement = Arrangement.spacedBy(horizontalSpacingDp.coerceIn(2, 24).dp)
     ) {

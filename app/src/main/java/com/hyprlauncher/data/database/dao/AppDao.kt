@@ -14,6 +14,9 @@ interface AppDao {
     @Query("SELECT * FROM apps WHERE isHidden = 0 ORDER BY label ASC")
     fun getAllVisibleApps(): Flow<List<AppEntity>>
 
+    @Query("SELECT packageName FROM apps WHERE isHidden = 0")
+    suspend fun getAllVisiblePackageNames(): List<String>
+
     @Query("SELECT * FROM apps WHERE isHidden = 0 AND workspaceId = :workspaceId ORDER BY label ASC")
     fun getAppsForWorkspace(workspaceId: Int): Flow<List<AppEntity>>
 

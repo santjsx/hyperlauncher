@@ -32,6 +32,7 @@ data class CacheStats(
  */
 interface IconCache {
     suspend fun getIcon(packageName: String, activityName: String? = null): Bitmap?
+    suspend fun preloadIcons(packageNames: List<String>) {}
     suspend fun invalidate(packageName: String)
     suspend fun clear()
     fun trimMemory(level: Int) {}
@@ -60,6 +61,15 @@ class DefaultIconCache @Inject constructor(
     private val systemFetches = AtomicInteger(0)
 
     private val standardIconSize = 144 // 144x144 px standard high-DPI icon canvas
+
+    override suspend fun preloadIcons(packageNames: List<String>) = withContext(ioDispatcher) {
+        packageNames.forEach { pkg ->
+            val inMemory = synchronized(memoryCache) { memoryCache.get(pkg) != null }
+            if (!inMemory) {
+                getIcon(pkg)
+            }
+        }
+    }
 
     override suspend fun getIcon(packageName: String, activityName: String?): Bitmap? = withContext(ioDispatcher) {
         val cacheKey = packageName

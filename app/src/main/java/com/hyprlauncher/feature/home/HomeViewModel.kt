@@ -36,7 +36,8 @@ import com.hyprlauncher.core.widget.WidgetHostManager
 import com.hyprlauncher.data.repository.WidgetRepository
 import com.hyprlauncher.domain.model.LauncherWidget
 import com.hyprlauncher.domain.model.WidgetProviderItem
-import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,6 +47,29 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import dagger.hilt.android.lifecycle.HiltViewModel
+
+sealed interface WidgetPlacementRequest {
+    data class BindPermissionNeeded(
+        val appWidgetId: Int,
+        val intent: Intent,
+        val provider: WidgetProviderItem,
+        val cellX: Int,
+        val cellY: Int,
+        val spanX: Int,
+        val spanY: Int
+    ) : WidgetPlacementRequest
+
+    data class ConfigureNeeded(
+        val appWidgetId: Int,
+        val intent: Intent,
+        val provider: WidgetProviderItem,
+        val cellX: Int,
+        val cellY: Int,
+        val spanX: Int,
+        val spanY: Int
+    ) : WidgetPlacementRequest
+}
 
 data class HomeUiState(
     val preferences: LauncherPreferences = LauncherPreferences(),
@@ -97,6 +121,9 @@ class HomeViewModel @Inject constructor(
     private val lastLaunchResult = MutableStateFlow<LaunchResult?>(null)
     private val searchQueryFlow = MutableStateFlow("")
     private val availableWidgetProvidersFlow = MutableStateFlow<List<WidgetProviderItem>>(emptyList())
+
+    val widgetEventChannel = Channel<WidgetPlacementRequest>(Channel.BUFFERED)
+    val widgetEvents = widgetEventChannel.receiveAsFlow()
 
     init {
         // Start listening to widget host updates (PRD Section 25)
@@ -158,8 +185,11 @@ class HomeViewModel @Inject constructor(
         val workspaceApps = if (activeWs != null && activeWs.layoutConfig.assignedPackageNames.isNotEmpty()) {
             val assignedSet = activeWs.layoutConfig.assignedPackageNames.toSet()
             apps.filter { it.packageName in assignedSet }
-        } else {
+        } else if (customization.layout.showAllAppsOnHome) {
             apps
+        } else {
+            val favs = apps.filter { it.isFavorite }
+            if (favs.isNotEmpty()) favs else apps.take(12)
         }
 
         val filtered = if (query.isNotBlank()) {
@@ -465,24 +495,115 @@ class HomeViewModel @Inject constructor(
         spanY: Int = provider.minSpanY
     ) {
         viewModelScope.launch {
-            val activeWsId = uiState.value.preferences.activeWorkspaceId
             val appWidgetId = widgetHostManager.allocateAppWidgetId()
             if (appWidgetId != -1) {
                 val component = ComponentName(provider.providerPackage, provider.providerClass)
-                widgetHostManager.bindAppWidgetIdIfAllowed(appWidgetId, component)
-                widgetRepository.placeWidget(
-                    workspaceId = activeWsId,
-                    appWidgetId = appWidgetId,
-                    providerPackage = provider.providerPackage,
-                    providerClass = provider.providerClass,
-                    cellX = cellX,
-                    cellY = cellY,
-                    spanX = spanX,
-                    spanY = spanY,
-                    label = provider.widgetLabel
-                )
+                val isBound = widgetHostManager.bindAppWidgetIdIfAllowed(appWidgetId, component)
+                if (isBound) {
+                    if (!provider.configureActivity.isNullOrBlank()) {
+                        val configIntent = widgetHostManager.createConfigureWidgetIntent(
+                            appWidgetId,
+                            ComponentName(provider.providerPackage, provider.configureActivity)
+                        )
+                        if (configIntent != null) {
+                            widgetEventChannel.send(
+                                WidgetPlacementRequest.ConfigureNeeded(
+                                    appWidgetId = appWidgetId,
+                                    intent = configIntent,
+                                    provider = provider,
+                                    cellX = cellX,
+                                    cellY = cellY,
+                                    spanX = spanX,
+                                    spanY = spanY
+                                )
+                            )
+                            return@launch
+                        }
+                    }
+                    completeWidgetPlacement(appWidgetId, provider, cellX, cellY, spanX, spanY)
+                } else {
+                    val bindIntent = widgetHostManager.createBindWidgetIntent(appWidgetId, component)
+                    if (bindIntent != null) {
+                        widgetEventChannel.send(
+                            WidgetPlacementRequest.BindPermissionNeeded(
+                                appWidgetId = appWidgetId,
+                                intent = bindIntent,
+                                provider = provider,
+                                cellX = cellX,
+                                cellY = cellY,
+                                spanX = spanX,
+                                spanY = spanY
+                            )
+                        )
+                    } else {
+                        // Fallback for tests or automated bind
+                        completeWidgetPlacement(appWidgetId, provider, cellX, cellY, spanX, spanY)
+                    }
+                }
             }
         }
+    }
+
+    fun onWidgetBindResult(success: Boolean, req: WidgetPlacementRequest.BindPermissionNeeded) {
+        viewModelScope.launch {
+            if (success) {
+                if (!req.provider.configureActivity.isNullOrBlank()) {
+                    val configIntent = widgetHostManager.createConfigureWidgetIntent(
+                        req.appWidgetId,
+                        ComponentName(req.provider.providerPackage, req.provider.configureActivity)
+                    )
+                    if (configIntent != null) {
+                        widgetEventChannel.send(
+                            WidgetPlacementRequest.ConfigureNeeded(
+                                appWidgetId = req.appWidgetId,
+                                intent = configIntent,
+                                provider = req.provider,
+                                cellX = req.cellX,
+                                cellY = req.cellY,
+                                spanX = req.spanX,
+                                spanY = req.spanY
+                            )
+                        )
+                        return@launch
+                    }
+                }
+                completeWidgetPlacement(req.appWidgetId, req.provider, req.cellX, req.cellY, req.spanX, req.spanY)
+            } else {
+                widgetHostManager.deleteAppWidgetId(req.appWidgetId)
+            }
+        }
+    }
+
+    fun onWidgetConfigureResult(success: Boolean, req: WidgetPlacementRequest.ConfigureNeeded) {
+        viewModelScope.launch {
+            if (success) {
+                completeWidgetPlacement(req.appWidgetId, req.provider, req.cellX, req.cellY, req.spanX, req.spanY)
+            } else {
+                widgetHostManager.deleteAppWidgetId(req.appWidgetId)
+            }
+        }
+    }
+
+    private suspend fun completeWidgetPlacement(
+        appWidgetId: Int,
+        provider: WidgetProviderItem,
+        cellX: Int,
+        cellY: Int,
+        spanX: Int,
+        spanY: Int
+    ) {
+        val activeWsId = uiState.value.preferences.activeWorkspaceId
+        widgetRepository.placeWidget(
+            workspaceId = activeWsId,
+            appWidgetId = appWidgetId,
+            providerPackage = provider.providerPackage,
+            providerClass = provider.providerClass,
+            cellX = cellX,
+            cellY = cellY,
+            spanX = spanX,
+            spanY = spanY,
+            label = provider.widgetLabel
+        )
     }
 
     fun resizeWidget(widgetId: String, spanX: Int, spanY: Int) {

@@ -167,7 +167,7 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = false),
+                    .weight(1f, fill = true),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Clock & Date component
@@ -254,7 +254,9 @@ fun HomeScreen(
                             }
                         },
                         label = "WorkspaceGridTransition",
-                        modifier = Modifier.weight(1f, fill = false)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = true)
                     ) { _ ->
                         HomeAppGrid(
                             apps = uiState.filteredApps,

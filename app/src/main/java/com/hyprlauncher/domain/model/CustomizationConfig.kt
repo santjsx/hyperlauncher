@@ -49,7 +49,8 @@ data class LayoutConfig(
     val showDock: Boolean = true,
     val clockAtTop: Boolean = true,
     val wallpaperDim: Float = 0.2f,
-    val wallpaperAmoledMode: Boolean = false
+    val wallpaperAmoledMode: Boolean = false,
+    val showAllAppsOnHome: Boolean = false
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("showWaybar", showWaybar)
@@ -61,6 +62,7 @@ data class LayoutConfig(
         put("clockAtTop", clockAtTop)
         put("wallpaperDim", wallpaperDim.toDouble())
         put("wallpaperAmoledMode", wallpaperAmoledMode)
+        put("showAllAppsOnHome", showAllAppsOnHome)
     }
 
     companion object {
@@ -75,7 +77,8 @@ data class LayoutConfig(
                 showDock = json.optBoolean("showDock", true),
                 clockAtTop = json.optBoolean("clockAtTop", true),
                 wallpaperDim = json.optDouble("wallpaperDim", 0.2).toFloat(),
-                wallpaperAmoledMode = json.optBoolean("wallpaperAmoledMode", false)
+                wallpaperAmoledMode = json.optBoolean("wallpaperAmoledMode", false),
+                showAllAppsOnHome = json.optBoolean("showAllAppsOnHome", false)
             )
         }
     }

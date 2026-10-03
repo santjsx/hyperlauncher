@@ -51,9 +51,21 @@ fun HomeClock(
 
         while (true) {
             val now = Date()
-            currentTimeString = timeFormat.format(now).uppercase()
-            currentDateString = dateFormat.format(now).uppercase()
-            delay(if (showSeconds) 500 else 1000)
+            val formattedTime = timeFormat.format(now).uppercase()
+            val formattedDate = dateFormat.format(now).uppercase()
+            if (currentTimeString != formattedTime) {
+                currentTimeString = formattedTime
+            }
+            if (currentDateString != formattedDate) {
+                currentDateString = formattedDate
+            }
+            val nowMs = System.currentTimeMillis()
+            val delayMs = if (showSeconds) {
+                1000L - (nowMs % 1000L)
+            } else {
+                60000L - (nowMs % 60000L)
+            }
+            delay(delayMs.coerceAtLeast(100L))
         }
     }
 

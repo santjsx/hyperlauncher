@@ -44,7 +44,12 @@ class DefaultAppRepository @Inject constructor(
     }
 
     override suspend fun syncAllApps(): Result<Int> {
-        return discoverAndIndexAppsUseCase()
+        val result = discoverAndIndexAppsUseCase()
+        result.onSuccess {
+            val packageNames = appDao.getAllVisiblePackageNames()
+            iconCache.preloadIcons(packageNames)
+        }
+        return result
     }
 
     override suspend fun setFavorite(packageName: String, isFavorite: Boolean) {

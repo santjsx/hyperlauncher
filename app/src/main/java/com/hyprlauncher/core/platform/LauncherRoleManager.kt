@@ -4,6 +4,7 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -60,8 +61,25 @@ class DefaultLauncherRoleManager @Inject constructor(
             }
         }
 
-        // Fallback for devices without standard RoleManager implementation
-        return Intent(Settings.ACTION_HOME_SETTINGS).apply {
+        // Fallback 1: ACTION_HOME_SETTINGS
+        val homeSettingsIntent = Intent(Settings.ACTION_HOME_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (homeSettingsIntent.resolveActivity(packageManager) != null) {
+            return homeSettingsIntent
+        }
+
+        // Fallback 2: ACTION_MANAGE_DEFAULT_APPS_SETTINGS
+        val manageDefaultAppsIntent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (manageDefaultAppsIntent.resolveActivity(packageManager) != null) {
+            return manageDefaultAppsIntent
+        }
+
+        // Fallback 3: App details settings
+        return Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${context.packageName}")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }

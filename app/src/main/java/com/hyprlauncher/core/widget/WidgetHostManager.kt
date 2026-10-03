@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
@@ -54,6 +55,8 @@ interface WidgetHostManager {
     fun getAppWidgetInfo(appWidgetId: Int): AppWidgetProviderInfo?
     fun createView(context: Context, appWidgetId: Int, info: AppWidgetProviderInfo): AppWidgetHostView?
     fun bindAppWidgetIdIfAllowed(appWidgetId: Int, provider: ComponentName): Boolean
+    fun createBindWidgetIntent(appWidgetId: Int, provider: ComponentName): Intent? = null
+    fun createConfigureWidgetIntent(appWidgetId: Int, configureComponent: ComponentName): Intent? = null
 }
 
 @Singleton
@@ -154,5 +157,22 @@ class DefaultWidgetHostManager @Inject constructor(
         return runCatching {
             manager.bindAppWidgetIdIfAllowed(appWidgetId, provider)
         }.getOrDefault(false)
+    }
+
+    override fun createBindWidgetIntent(appWidgetId: Int, provider: ComponentName): Intent? {
+        return Intent(AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, provider)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER_PROFILE, Process.myUserHandle())
+            }
+        }
+    }
+
+    override fun createConfigureWidgetIntent(appWidgetId: Int, configureComponent: ComponentName): Intent {
+        return Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
+            component = configureComponent
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        }
     }
 }

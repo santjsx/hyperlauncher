@@ -83,17 +83,44 @@ fun WidgetHostContainer(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         try {
-                            widgetHostManager.createView(ctx, widget.appWidgetId, appWidgetInfo)
+                            val view = widgetHostManager.createView(ctx, widget.appWidgetId, appWidgetInfo)
                                 ?: createFallbackErrorView(ctx).also { renderError = true }
+                            view.setOnLongClickListener {
+                                isEditMode = true
+                                true
+                            }
+                            view
                         } catch (t: Throwable) {
                             renderError = true
                             createFallbackErrorView(ctx)
                         }
                     },
                     update = { view ->
-                        // Optional view updates
+                        view.setOnLongClickListener {
+                            isEditMode = true
+                            true
+                        }
                     }
                 )
+            }
+
+            // Quick edit button to ensure edit mode is always accessible even if native widget consumes touches
+            if (!isEditMode && !hasError) {
+                Surface(
+                    shape = RoundedCornerShape(bottomStart = 6.dp, topEnd = 4.dp),
+                    color = HyprTheme.colors.background.copy(alpha = 0.85f),
+                    border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .clickable { isEditMode = true }
+                ) {
+                    Text(
+                        text = "edit",
+                        style = HyprTheme.typography.monospaceSmall.copy(fontSize = 9.sp),
+                        color = HyprTheme.colors.textSecondary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
 
             // Edit Overlay: Resize & Removal controls

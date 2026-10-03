@@ -380,6 +380,8 @@ fun HomeScreen(
     if (showWidgetPicker) {
         WidgetPickerDialog(
             providers = uiState.availableWidgetProviders,
+            activeWidgets = uiState.widgets,
+            onRemoveWidget = onRemoveWidget,
             onSelectProvider = { provider ->
                 onPlaceWidget(provider)
                 showWidgetPicker = false

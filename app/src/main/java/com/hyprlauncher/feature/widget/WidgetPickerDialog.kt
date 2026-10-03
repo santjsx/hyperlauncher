@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.hyprlauncher.core.designsystem.theme.HyprTheme
+import com.hyprlauncher.domain.model.LauncherWidget
 import com.hyprlauncher.domain.model.WidgetProviderItem
 
 /**
@@ -37,6 +38,8 @@ import com.hyprlauncher.domain.model.WidgetProviderItem
 @Composable
 fun WidgetPickerDialog(
     providers: List<WidgetProviderItem>,
+    activeWidgets: List<LauncherWidget> = emptyList(),
+    onRemoveWidget: (String) -> Unit = {},
     onSelectProvider: (WidgetProviderItem) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -81,7 +84,7 @@ fun WidgetPickerDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "select widget provider to place",
+                            text = "manage active or select widget to place",
                             style = HyprTheme.typography.monospaceSmall,
                             color = HyprTheme.colors.textSecondary
                         )
@@ -103,6 +106,72 @@ fun WidgetPickerDialog(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // Active Widgets Section (Quick Removal & Management)
+                if (activeWidgets.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Text(
+                            text = "# active on workspace (${activeWidgets.size})",
+                            style = HyprTheme.typography.monospaceSmall,
+                            color = HyprTheme.colors.accent,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            activeWidgets.forEach { widget ->
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = HyprTheme.colors.surfaceElevated,
+                                    border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = widget.providerPackage.substringAfterLast('.'),
+                                                style = HyprTheme.typography.monospaceMedium,
+                                                color = HyprTheme.colors.textPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1
+                                            )
+                                            Text(
+                                                text = "span: ${widget.spanX}x${widget.spanY} · id: ${widget.appWidgetId}",
+                                                style = HyprTheme.typography.monospaceSmall,
+                                                color = HyprTheme.colors.textSecondary,
+                                                maxLines = 1
+                                            )
+                                        }
+
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = HyprTheme.colors.error.copy(alpha = 0.15f),
+                                            border = BorderStroke(1.dp, HyprTheme.colors.error),
+                                            modifier = Modifier.clickable { onRemoveWidget(widget.id) }
+                                        ) {
+                                            Text(
+                                                text = "remove",
+                                                style = HyprTheme.typography.monospaceSmall,
+                                                color = HyprTheme.colors.error,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Search Bar
                 Surface(

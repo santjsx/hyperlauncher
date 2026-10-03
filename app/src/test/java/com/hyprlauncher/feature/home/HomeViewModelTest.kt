@@ -4,6 +4,12 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.hyprlauncher.core.gesture.DefaultGestureActionExecutor
+import com.hyprlauncher.core.gesture.DefaultGestureRepository
+import com.hyprlauncher.core.gesture.GestureActionExecutor
+import com.hyprlauncher.core.gesture.GestureRepository
+import com.hyprlauncher.core.gesture.GestureType
+import com.hyprlauncher.core.gesture.LauncherAction
 import com.hyprlauncher.core.icon.DefaultIconCache
 import com.hyprlauncher.core.platform.DefaultAppLauncher
 import com.hyprlauncher.core.platform.DefaultLauncherRoleManager
@@ -54,6 +60,8 @@ class HomeViewModelTest {
     private lateinit var appDao: AppDao
     private lateinit var workspaceDao: WorkspaceDao
     private lateinit var preferencesRepository: LauncherPreferencesRepository
+    private lateinit var gestureRepository: GestureRepository
+    private lateinit var gestureActionExecutor: GestureActionExecutor
     private lateinit var viewModel: HomeViewModel
 
     @Before
@@ -72,6 +80,12 @@ class HomeViewModelTest {
         )
         preferencesRepository = DefaultLauncherPreferencesRepository(dataStore)
 
+        val gestureDataStore = PreferenceDataStoreFactory.create(
+            scope = testScope,
+            produceFile = { tmpFolder.newFile("vm_test_gestures.preferences_pb") }
+        )
+        gestureRepository = DefaultGestureRepository(gestureDataStore)
+
         val iconCache = DefaultIconCache(context, testDispatcher)
         val discoveryManager = DefaultPackageDiscoveryManager(context, testDispatcher)
         val indexUseCase = DiscoverAndIndexAppsUseCase(discoveryManager, appDao, testDispatcher)
@@ -80,6 +94,7 @@ class HomeViewModelTest {
         val launchAppUseCase = LaunchAppUseCase(appLauncher)
         val roleManager = DefaultLauncherRoleManager(context)
         val getRoleStatusUseCase = GetLauncherRoleStatusUseCase(roleManager)
+        gestureActionExecutor = DefaultGestureActionExecutor(context, appLauncher)
 
         // Seed sample test apps
         appDao.upsertApp(AppEntity(packageName = "org.mozilla.firefox", activityName = "MainActivity", label = "Firefox"))
@@ -93,6 +108,8 @@ class HomeViewModelTest {
             preferencesRepository = preferencesRepository,
             workspaceDao = workspaceDao,
             appRepository = appRepository,
+            gestureRepository = gestureRepository,
+            gestureActionExecutor = gestureActionExecutor,
             launchAppUseCase = launchAppUseCase,
             getLauncherRoleStatusUseCase = getRoleStatusUseCase
         )
@@ -153,5 +170,34 @@ class HomeViewModelTest {
         viewModel.launchApp("com.nonexistent.app", null)
         val state = viewModel.uiState.first { it.lastLaunchResult != null }
         assertTrue(state.lastLaunchResult is LaunchResult.AppNotFound)
+    }
+
+    @Test
+    fun defaultGesturesPopulateInUiState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        val state = viewModel.uiState.first { it.gestureBindings.isNotEmpty() }
+        assertEquals(LauncherAction.OpenAppDrawer, state.gestureBindings[GestureType.SWIPE_UP])
+        assertEquals(LauncherAction.OpenNotificationShade, state.gestureBindings[GestureType.SWIPE_DOWN])
+        assertEquals(LauncherAction.NextWorkspace, state.gestureBindings[GestureType.SWIPE_LEFT])
+        assertEquals(LauncherAction.PreviousWorkspace, state.gestureBindings[GestureType.SWIPE_RIGHT])
+    }
+
+    @Test
+    fun triggerSwipeUpExecutesOpenDrawerCallback() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        var drawerOpened = false
+        viewModel.onGestureTriggered(GestureType.SWIPE_UP) {
+            drawerOpened = true
+        }
+        testScheduler.advanceUntilIdle()
+        assertTrue(drawerOpened)
+    }
+
+    @Test
+    fun updateGestureBindingPersistsAndUpdatesState() = runTest(testDispatcher) {
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.setGestureBinding(GestureType.DOUBLE_TAP, LauncherAction.OpenSettings)
+        val state = viewModel.uiState.first { it.gestureBindings[GestureType.DOUBLE_TAP] == LauncherAction.OpenSettings }
+        assertEquals(LauncherAction.OpenSettings, state.gestureBindings[GestureType.DOUBLE_TAP])
     }
 }

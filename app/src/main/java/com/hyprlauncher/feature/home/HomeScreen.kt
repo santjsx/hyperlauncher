@@ -27,13 +27,16 @@ import com.hyprlauncher.core.designsystem.theme.HyprTheme
 import com.hyprlauncher.data.database.entity.WorkspaceEntity
 import com.hyprlauncher.feature.home.component.HomeAppGrid
 import com.hyprlauncher.feature.home.component.HomeClock
+import com.hyprlauncher.core.gesture.GestureType
+import com.hyprlauncher.core.gesture.hyprGestureHandler
 import com.hyprlauncher.feature.home.component.HomeDock
 import com.hyprlauncher.feature.home.component.HomeSearchBar
 import com.hyprlauncher.feature.home.component.HomeWallpaperSurface
 
 /**
- * HyprLauncher Home Screen conforming to PRD Phase 3 (Sections 8, 9, 10, 11, 24, 27).
- * Implements a declarative layout engine orchestrating the Waybar, Clock, Search bar, App grid, and Dock.
+ * HyprLauncher Home Screen conforming to PRD Phase 3 (Sections 8, 9, 10, 11, 24, 27)
+ * and Phase 5 Gesture recognition.
+ * Implements a declarative layout engine orchestrating the Waybar, Clock, Search bar, App grid, Dock, and Gestures.
  */
 @Composable
 fun HomeScreen(
@@ -41,6 +44,7 @@ fun HomeScreen(
     onWorkspaceSelected: (Int) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onOpenDrawer: () -> Unit = {},
+    onGesture: (GestureType) -> Unit = {},
     onAppClick: (String, String?) -> Unit,
     onSetDefaultLauncher: () -> Unit,
     loadIcon: suspend (String) -> Bitmap? = { null },
@@ -50,6 +54,8 @@ fun HomeScreen(
         amoledMode = uiState.preferences.wallpaperAmoledMode,
         dimLevel = uiState.preferences.wallpaperDim,
         modifier = modifier
+            .fillMaxSize()
+            .hyprGestureHandler(onGesture = onGesture)
     ) {
         Column(
             modifier = Modifier

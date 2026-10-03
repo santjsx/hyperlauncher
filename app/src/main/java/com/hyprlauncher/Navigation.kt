@@ -30,6 +30,9 @@ fun MainNavigation() {
                     onWorkspaceSelected = viewModel::onWorkspaceSelected,
                     onSearchQueryChange = viewModel::onSearchQueryChanged,
                     onOpenDrawer = { backStack.add(DrawerKey) },
+                    onGesture = { gesture ->
+                        viewModel.onGestureTriggered(gesture, onOpenDrawer = { backStack.add(DrawerKey) })
+                    },
                     onAppClick = { pkg, act -> viewModel.launchApp(pkg, act) },
                     onSetDefaultLauncher = {
                         uiState.requestDefaultIntent?.let { intent ->

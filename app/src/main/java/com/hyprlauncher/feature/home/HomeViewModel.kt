@@ -4,6 +4,10 @@ import android.content.Intent
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hyprlauncher.core.gesture.GestureActionExecutor
+import com.hyprlauncher.core.gesture.GestureRepository
+import com.hyprlauncher.core.gesture.GestureType
+import com.hyprlauncher.core.gesture.LauncherAction
 import com.hyprlauncher.core.platform.LaunchResult
 import com.hyprlauncher.data.database.dao.WorkspaceDao
 import com.hyprlauncher.data.database.entity.AppEntity
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,6 +33,7 @@ data class HomeUiState(
     val apps: List<AppEntity> = emptyList(),
     val dockApps: List<AppEntity> = emptyList(),
     val filteredApps: List<AppEntity> = emptyList(),
+    val gestureBindings: Map<GestureType, LauncherAction> = emptyMap(),
     val searchQuery: String = "",
     val totalAppsIndexed: Int = 0,
     val isDefaultLauncher: Boolean = true,
@@ -42,13 +48,16 @@ class HomeViewModel @Inject constructor(
     private val workspaceDao: WorkspaceDao,
     private val appRepository: AppRepository,
     private val launchAppUseCase: LaunchAppUseCase,
-    private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase
+    private val getLauncherRoleStatusUseCase: GetLauncherRoleStatusUseCase,
+    private val gestureRepository: GestureRepository,
+    private val gestureActionExecutor: GestureActionExecutor
 ) : ViewModel() {
 
     private data class CoreData(
         val preferences: LauncherPreferences,
         val workspaces: List<WorkspaceEntity>,
-        val apps: List<AppEntity>
+        val apps: List<AppEntity>,
+        val gestureBindings: Map<GestureType, LauncherAction>
     )
 
     private val roleStatusFlow = MutableStateFlow(getLauncherRoleStatusUseCase())
@@ -79,9 +88,10 @@ class HomeViewModel @Inject constructor(
     private val coreDataFlow = combine(
         preferencesRepository.preferences,
         workspaceDao.getAllWorkspaces(),
-        appRepository.allApps
-    ) { prefs, workspaces, apps ->
-        CoreData(prefs, workspaces, apps)
+        appRepository.allApps,
+        gestureRepository.gestureBindings
+    ) { prefs, workspaces, apps, gestures ->
+        CoreData(prefs, workspaces, apps, gestures)
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -116,6 +126,7 @@ class HomeViewModel @Inject constructor(
             apps = apps,
             dockApps = dockApps,
             filteredApps = filtered,
+            gestureBindings = coreData.gestureBindings,
             searchQuery = query,
             totalAppsIndexed = apps.size,
             isDefaultLauncher = roleStatus.isDefault,
@@ -142,6 +153,38 @@ class HomeViewModel @Inject constructor(
     fun launchApp(packageName: String, activityName: String? = null) {
         val result = launchAppUseCase(packageName, activityName)
         lastLaunchResult.value = result
+    }
+
+    fun onGestureTriggered(gesture: GestureType, onOpenDrawer: () -> Unit) {
+        viewModelScope.launch {
+            val bindings = gestureRepository.gestureBindings.first()
+            val action = bindings[gesture] ?: LauncherAction.None
+            val currentWs = uiState.value.preferences.activeWorkspaceId
+            val allWs = uiState.value.workspaces
+
+            gestureActionExecutor.execute(
+                action = action,
+                onOpenDrawer = onOpenDrawer,
+                onNextWorkspace = {
+                    if (allWs.isNotEmpty()) {
+                        val nextWs = allWs.firstOrNull { it.id > currentWs }?.id ?: allWs.first().id
+                        onWorkspaceSelected(nextWs)
+                    }
+                },
+                onPreviousWorkspace = {
+                    if (allWs.isNotEmpty()) {
+                        val prevWs = allWs.lastOrNull { it.id < currentWs }?.id ?: allWs.last().id
+                        onWorkspaceSelected(prevWs)
+                    }
+                }
+            )
+        }
+    }
+
+    fun setGestureBinding(gesture: GestureType, action: LauncherAction) {
+        viewModelScope.launch {
+            gestureRepository.setBinding(gesture, action)
+        }
     }
 
     suspend fun getAppIcon(packageName: String): Bitmap? {

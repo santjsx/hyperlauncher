@@ -11,6 +11,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,6 +111,7 @@ fun HomeScreen(
     var showThemePicker by remember { mutableStateOf(false) }
     var showCustomizationDialog by remember { mutableStateOf(false) }
     var showWidgetPicker by remember { mutableStateOf(false) }
+    var isDefaultBannerDismissed by rememberSaveable { mutableStateOf(false) }
 
     val activeWallpaperUri = uiState.activeWorkspace?.wallpaperUri
         ?: uiState.activeWorkspace?.layoutConfig?.wallpaperUri
@@ -127,7 +132,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .safeDrawingPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Header: Waybar status bar + Optional default launcher banner
@@ -149,9 +154,12 @@ fun HomeScreen(
                     )
                 }
 
-                if (!uiState.isDefaultLauncher) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    DefaultLauncherBanner(onClick = onSetDefaultLauncher)
+                if (!uiState.isDefaultLauncher && !isDefaultBannerDismissed) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    DefaultLauncherBanner(
+                        onClick = onSetDefaultLauncher,
+                        onDismiss = { isDefaultBannerDismissed = true }
+                    )
                 }
             }
 
@@ -166,13 +174,13 @@ fun HomeScreen(
                 val showClock = uiState.customizationConfig.layout.showClock
                     && (uiState.activeWorkspace?.layoutConfig?.showClock ?: uiState.preferences.showClock)
                 if (showClock) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     HomeClock(
                         clock24Hour = uiState.preferences.clock24Hour,
                         showSeconds = uiState.preferences.showClockSeconds,
                         showDate = uiState.customizationConfig.layout.showDate && uiState.preferences.showDate
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // Interactive Rofi / Search bar
@@ -191,7 +199,7 @@ fun HomeScreen(
                             }
                         }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // Widgets Canvas for Active Workspace (PRD Section 25)
@@ -199,8 +207,8 @@ fun HomeScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(vertical = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         uiState.widgets.forEach { widget ->
                             WidgetHostContainer(
@@ -208,13 +216,11 @@ fun HomeScreen(
                                 widgetHostManager = widgetHostManager,
                                 onResize = { spanX, spanY -> onResizeWidget(widget.id, spanX, spanY) },
                                 onRemove = { onRemoveWidget(widget.id) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height((widget.spanY * 60 + 16).coerceIn(72, 320).dp)
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
 
                 // App Grid with Hyprland Horizontal Workspace Transition (Configurable timing via PRD §29)
@@ -382,11 +388,12 @@ fun HomeScreen(
 }
 
 @Composable
-private fun DefaultLauncherBanner(onClick: () -> Unit) {
+private fun DefaultLauncherBanner(
+    onClick: () -> Unit,
+    onDismiss: () -> Unit
+) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth(),
         shape = HyprTheme.shapes.small,
         color = HyprTheme.colors.surfaceElevated,
         border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.accentSecondary)
@@ -396,16 +403,33 @@ private fun DefaultLauncherBanner(onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onClick),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "default launcher: unset",
+                    style = HyprTheme.typography.monospaceSmall,
+                    color = HyprTheme.colors.warning
+                )
+                Text(
+                    text = "[set default]",
+                    style = HyprTheme.typography.monospaceSmall,
+                    color = HyprTheme.colors.accent,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "default launcher: unset",
+                text = "✕",
                 style = HyprTheme.typography.monospaceSmall,
-                color = HyprTheme.colors.warning
-            )
-            Text(
-                text = "[set default]",
-                style = HyprTheme.typography.monospaceSmall,
-                color = HyprTheme.colors.accent,
-                fontWeight = FontWeight.Bold
+                color = HyprTheme.colors.textSecondary,
+                modifier = Modifier
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
     }
@@ -457,7 +481,9 @@ private fun WaybarTopBar(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                             style = HyprTheme.typography.statusModule,
                             color = if (isActive) HyprTheme.colors.background else HyprTheme.colors.textSecondary,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -472,14 +498,21 @@ private fun WaybarTopBar(
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         style = HyprTheme.typography.statusModule,
                         color = HyprTheme.colors.accent,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
         }
 
+        Spacer(modifier = Modifier.width(6.dp))
+
         // Status indicator modules + Rofi drawer button + Theme picker button + Rice customization button + Widget button
         Row(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -494,7 +527,9 @@ private fun WaybarTopBar(
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.accentSecondary,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Surface(
@@ -508,7 +543,9 @@ private fun WaybarTopBar(
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.terminalGreen,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Surface(
@@ -522,7 +559,9 @@ private fun WaybarTopBar(
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.accent,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Surface(
@@ -536,7 +575,9 @@ private fun WaybarTopBar(
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.accentSecondary,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Surface(
@@ -550,7 +591,9 @@ private fun WaybarTopBar(
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.accentSecondary,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Surface(
@@ -564,27 +607,9 @@ private fun WaybarTopBar(
                     style = HyprTheme.typography.statusModule,
                     color = HyprTheme.colors.accent,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = Color.Transparent,
-                modifier = Modifier.clickable { onOpenDiagnostics() }
-            ) {
-                HyprStatusBadge(
-                    text = "arch",
-                    accentColor = HyprTheme.colors.accent
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = Color.Transparent,
-                modifier = Modifier.clickable { onOpenDiagnostics() }
-            ) {
-                HyprStatusBadge(
-                    text = performanceModeName.take(4).lowercase(),
-                    accentColor = HyprTheme.colors.accentSecondary
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

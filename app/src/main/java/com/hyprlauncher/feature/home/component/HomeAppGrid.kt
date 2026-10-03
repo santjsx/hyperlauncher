@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -134,12 +135,11 @@ private fun AppGridTile(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = HyprTheme.shapes.small,
-        color = HyprTheme.colors.surface,
-        border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.border)
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {

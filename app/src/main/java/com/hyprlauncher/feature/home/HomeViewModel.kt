@@ -37,6 +37,7 @@ import com.hyprlauncher.data.repository.WidgetRepository
 import com.hyprlauncher.domain.model.LauncherWidget
 import com.hyprlauncher.domain.model.WidgetProviderItem
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -95,6 +96,7 @@ class HomeViewModel @Inject constructor(
     private val roleStatusFlow = MutableStateFlow(getLauncherRoleStatusUseCase())
     private val lastLaunchResult = MutableStateFlow<LaunchResult?>(null)
     private val searchQueryFlow = MutableStateFlow("")
+    private val availableWidgetProvidersFlow = MutableStateFlow<List<WidgetProviderItem>>(emptyList())
 
     init {
         // Start listening to widget host updates (PRD Section 25)
@@ -108,6 +110,16 @@ class HomeViewModel @Inject constructor(
         // Perform initial application discovery & indexing via AppRepository
         viewModelScope.launch {
             appRepository.syncAllApps()
+        }
+
+        // Load widget providers in background IO without blocking UI thread
+        refreshAvailableWidgetProviders()
+    }
+
+    fun refreshAvailableWidgetProviders() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val providers = runCatching { widgetRepository.getAvailableWidgetProviders() }.getOrDefault(emptyList())
+            availableWidgetProvidersFlow.value = providers
         }
     }
 
@@ -134,8 +146,8 @@ class HomeViewModel @Inject constructor(
         coreDataFlow,
         searchQueryFlow,
         roleStatusFlow,
-        lastLaunchResult
-    ) { coreData, query, roleStatus, launchResult ->
+        combine(lastLaunchResult, availableWidgetProvidersFlow) { res, provs -> res to provs }
+    ) { coreData, query, roleStatus, (launchResult, availableProviders) ->
         val apps = coreData.apps
         val prefs = coreData.preferences
         val customization = coreData.customizationConfig
@@ -183,7 +195,7 @@ class HomeViewModel @Inject constructor(
             dockApps = dockApps,
             filteredApps = filtered,
             widgets = activeWorkspaceWidgets,
-            availableWidgetProviders = widgetRepository.getAvailableWidgetProviders(),
+            availableWidgetProviders = availableProviders,
             gestureBindings = coreData.gestureBindings,
             searchQuery = query,
             totalAppsIndexed = apps.size,

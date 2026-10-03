@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hyprlauncher.core.designsystem.theme.HyprTheme
 import com.hyprlauncher.core.widget.WidgetHostManager
@@ -47,25 +48,32 @@ fun WidgetHostContainer(
     modifier: Modifier = Modifier
 ) {
     var isEditMode by remember { mutableStateOf(false) }
-    var hasError by remember { mutableStateOf(false) }
-    val context = LocalContext.current
+    var renderError by remember { mutableStateOf(false) }
+
+    val appWidgetInfo = remember(widget.appWidgetId) {
+        runCatching { widgetHostManager.getAppWidgetInfo(widget.appWidgetId) }.getOrNull()
+    }
+    val hasError = renderError || (appWidgetInfo == null)
+    val heightDp = if (hasError) 54.dp else (widget.spanY * 60 + 16).coerceIn(72, 320).dp
 
     Surface(
         modifier = modifier
+            .fillMaxWidth()
+            .height(heightDp)
             .combinedClickable(
                 onClick = {},
-                onLongClick = { isEditMode = !isEditMode }
+                onLongClick = { if (!hasError) isEditMode = !isEditMode }
             ),
         shape = HyprTheme.shapes.small,
-        color = HyprTheme.colors.surface,
+        color = if (hasError) HyprTheme.colors.surfaceElevated else HyprTheme.colors.surface,
         border = BorderStroke(
             HyprTheme.shapes.borderWidth,
-            if (isEditMode) HyprTheme.colors.accent else if (hasError) HyprTheme.colors.error else HyprTheme.colors.border
+            if (isEditMode) HyprTheme.colors.accent else if (hasError) HyprTheme.colors.error.copy(alpha = 0.5f) else HyprTheme.colors.border
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (hasError) {
-                // PRD Section 25 Fallback: Widget Failure -> Fallback Placeholder -> Launcher Continues
+                // PRD Section 25 Fallback: Sleek compact strip for uninstalled or unbindable widgets
                 WidgetErrorPlaceholder(
                     widget = widget,
                     onRemove = onRemove
@@ -75,15 +83,10 @@ fun WidgetHostContainer(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         try {
-                            val info = widgetHostManager.getAppWidgetInfo(widget.appWidgetId)
-                            if (info != null) {
-                                widgetHostManager.createView(ctx, widget.appWidgetId, info) ?: createFallbackErrorView(ctx)
-                            } else {
-                                hasError = true
-                                createFallbackErrorView(ctx)
-                            }
+                            widgetHostManager.createView(ctx, widget.appWidgetId, appWidgetInfo)
+                                ?: createFallbackErrorView(ctx).also { renderError = true }
                         } catch (t: Throwable) {
-                            hasError = true
+                            renderError = true
                             createFallbackErrorView(ctx)
                         }
                     },
@@ -111,37 +114,44 @@ private fun WidgetErrorPlaceholder(
     widget: LauncherWidget,
     onRemove: () -> Unit
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(8.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "[widget failure: ${widget.providerPackage.takeLast(20)}]",
-            style = HyprTheme.typography.monospaceSmall,
-            color = HyprTheme.colors.error,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "external provider crashed or uninstalled",
-            style = HyprTheme.typography.monospaceSmall,
-            color = HyprTheme.colors.textSecondary
-        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "[widget unavailable: ${widget.providerPackage.substringAfterLast('.')}]",
+                style = HyprTheme.typography.monospaceSmall,
+                color = HyprTheme.colors.error,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                text = "external provider uninstalled or unbindable",
+                style = HyprTheme.typography.monospaceSmall.copy(fontSize = 10.sp),
+                color = HyprTheme.colors.textSecondary,
+                maxLines = 1
+            )
+        }
         Surface(
             shape = RoundedCornerShape(4.dp),
-            color = HyprTheme.colors.surfaceElevated,
-            border = BorderStroke(HyprTheme.shapes.borderWidth, HyprTheme.colors.error),
+            color = HyprTheme.colors.error.copy(alpha = 0.15f),
+            border = BorderStroke(1.dp, HyprTheme.colors.error),
             modifier = Modifier
-                .padding(top = 6.dp)
+                .padding(start = 8.dp)
                 .clickable(onClick = onRemove)
         ) {
             Text(
-                text = "remove widget",
+                text = "remove",
                 style = HyprTheme.typography.monospaceSmall,
                 color = HyprTheme.colors.error,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 fontWeight = FontWeight.Bold
             )
         }

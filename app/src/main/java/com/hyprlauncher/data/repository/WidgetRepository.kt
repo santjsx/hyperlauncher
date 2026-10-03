@@ -111,7 +111,7 @@ class DefaultWidgetRepository @Inject constructor(
     override suspend fun removeWidget(id: String): Result<Unit> {
         val entity = widgetDao.getWidgetById(id) ?: return Result.success(Unit)
         return runCatching {
-            widgetHostManager.deleteAppWidgetId(entity.appWidgetId)
+            runCatching { widgetHostManager.deleteAppWidgetId(entity.appWidgetId) }
             widgetDao.deleteWidget(id)
             Unit
         }
@@ -119,7 +119,7 @@ class DefaultWidgetRepository @Inject constructor(
 
     override suspend fun removeWidgetByAppWidgetId(appWidgetId: Int): Result<Unit> {
         return runCatching {
-            widgetHostManager.deleteAppWidgetId(appWidgetId)
+            runCatching { widgetHostManager.deleteAppWidgetId(appWidgetId) }
             widgetDao.deleteWidgetByAppWidgetId(appWidgetId)
             Unit
         }

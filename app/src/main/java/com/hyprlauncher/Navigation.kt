@@ -64,7 +64,7 @@ fun MainNavigation() {
                             runCatching { context.startActivity(intent) }
                         }
                     },
-                    loadIcon = { pkg -> viewModel.getAppIcon(pkg) }
+                    loadIcon = viewModel::getAppIcon
                 )
             }
             entry<DrawerKey> {
@@ -80,7 +80,7 @@ fun MainNavigation() {
                     },
                     onToggleFavorite = drawerViewModel::toggleFavorite,
                     onDismiss = { backStack.removeLastOrNull() },
-                    loadIcon = { pkg -> drawerViewModel.getAppIcon(pkg) }
+                    loadIcon = drawerViewModel::getAppIcon
                 )
             }
             entry<RiceStudioKey> {
